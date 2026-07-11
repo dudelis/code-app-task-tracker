@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "appId": "af30d0ab-cc8c-4d89-8656-f04e1eb99ba3",
+  "appDisplayName": "Task Tracker",
+  "region": "prod",
+  "appType": "CodeApp",
+  "environmentId": "c16f1815-0724-eb38-a060-4fa6236bfd42",
+  "description": " ",
+  "buildPath": "./dist",
+  "buildEntryPoint": "index.html",
+  "localAppUrl": "http://localhost:3000",
+  "logoPath": "Default",
+  "connectionReferences": {},
+  "databaseReferences": {
+    "default.cds": {
+      "dataSources": {
+        "csa_customers": {
+          "entitySetName": "csa_customers",
+          "logicalName": "csa_customer",
+          "isHidden": false
+        }
+      },
+      "environmentVariableName": ""
+    }
+  }
+}

@@ -1,0 +1,114 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ImportExportXml version="9.2.26065.138" SolutionPackageVersion="9.2" languagecode="1033" generatedBy="CrmLive" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" OrganizationVersion="9.2.26065.138" OrganizationSchemaType="Standard" CRMServerServiceabilityVersion="9.2.26065.00141">
+  <SolutionManifest>
+    <UniqueName>TaskTracker</UniqueName>
+    <LocalizedNames>
+      <LocalizedName description="Task Tracker" languagecode="1033" />
+    </LocalizedNames>
+    <Descriptions />
+    <Version>1.0.0.0</Version>
+    <Managed>0</Managed>
+    <Publisher>
+      <UniqueName>CSADevelopment</UniqueName>
+      <LocalizedNames>
+        <LocalizedName description="CSA Development" languagecode="1033" />
+      </LocalizedNames>
+      <Descriptions />
+      <EMailAddress>KOFUKSZO@microsoft.com</EMailAddress>
+      <SupportingWebsiteUrl xsi:nil="true"></SupportingWebsiteUrl>
+      <CustomizationPrefix>csa</CustomizationPrefix>
+      <CustomizationOptionValuePrefix>77025</CustomizationOptionValuePrefix>
+      <Addresses>
+        <Address>
+          <AddressNumber>1</AddressNumber>
+          <AddressTypeCode>1</AddressTypeCode>
+          <City>Köln</City>
+          <County xsi:nil="true"></County>
+          <Country>Germany</Country>
+          <Fax xsi:nil="true"></Fax>
+          <FreightTermsCode xsi:nil="true"></FreightTermsCode>
+          <ImportSequenceNumber xsi:nil="true"></ImportSequenceNumber>
+          <Latitude xsi:nil="true"></Latitude>
+          <Line1>Holzmarkt 2a</Line1>
+          <Line2 xsi:nil="true"></Line2>
+          <Line3 xsi:nil="true"></Line3>
+          <Longitude xsi:nil="true"></Longitude>
+          <Name xsi:nil="true"></Name>
+          <PostalCode>50676</PostalCode>
+          <PostOfficeBox xsi:nil="true"></PostOfficeBox>
+          <PrimaryContactName xsi:nil="true"></PrimaryContactName>
+          <ShippingMethodCode>1</ShippingMethodCode>
+          <StateOrProvince>Cologne</StateOrProvince>
+          <Telephone1 xsi:nil="true"></Telephone1>
+          <Telephone2 xsi:nil="true"></Telephone2>
+          <Telephone3 xsi:nil="true"></Telephone3>
+          <TimeZoneRuleVersionNumber xsi:nil="true"></TimeZoneRuleVersionNumber>
+          <UPSZone xsi:nil="true"></UPSZone>
+          <UTCOffset xsi:nil="true"></UTCOffset>
+          <UTCConversionTimeZoneCode xsi:nil="true"></UTCConversionTimeZoneCode>
+        </Address>
+        <Address>
+          <AddressNumber>2</AddressNumber>
+          <AddressTypeCode>1</AddressTypeCode>
+          <City xsi:nil="true"></City>
+          <County xsi:nil="true"></County>
+          <Country xsi:nil="true"></Country>
+          <Fax xsi:nil="true"></Fax>
+          <FreightTermsCode xsi:nil="true"></FreightTermsCode>
+          <ImportSequenceNumber xsi:nil="true"></ImportSequenceNumber>
+          <Latitude xsi:nil="true"></Latitude>
+          <Line1 xsi:nil="true"></Line1>
+          <Line2 xsi:nil="true"></Line2>
+          <Line3 xsi:nil="true"></Line3>
+          <Longitude xsi:nil="true"></Longitude>
+          <Name xsi:nil="true"></Name>
+          <PostalCode xsi:nil="true"></PostalCode>
+          <PostOfficeBox xsi:nil="true"></PostOfficeBox>
+          <PrimaryContactName xsi:nil="true"></PrimaryContactName>
+          <ShippingMethodCode>1</ShippingMethodCode>
+          <StateOrProvince xsi:nil="true"></StateOrProvince>
+          <Telephone1 xsi:nil="true"></Telephone1>
+          <Telephone2 xsi:nil="true"></Telephone2>
+          <Telephone3 xsi:nil="true"></Telephone3>
+          <TimeZoneRuleVersionNumber xsi:nil="true"></TimeZoneRuleVersionNumber>
+          <UPSZone xsi:nil="true"></UPSZone>
+          <UTCOffset xsi:nil="true"></UTCOffset>
+          <UTCConversionTimeZoneCode xsi:nil="true"></UTCConversionTimeZoneCode>
+        </Address>
+      </Addresses>
+    </Publisher>
+    <RootComponents>
+      <RootComponent type="1" schemaName="csa_customer" behavior="0" />
+      <RootComponent type="1" schemaName="csa_label" behavior="1" />
+      <RootComponent type="1" schemaName="csa_note" behavior="1" />
+      <RootComponent type="1" schemaName="csa_project" behavior="1" />
+      <RootComponent type="1" schemaName="csa_task" behavior="1" />
+    </RootComponents>
+    <MissingDependencies>
+      <MissingDependency>
+        <Required type="1" schemaName="csa_label" displayName="csa_Label" solution="Active" />
+        <Dependent type="1" schemaName="csa_label" displayName="csa_Label" />
+      </MissingDependency>
+      <MissingDependency>
+        <Required type="1" schemaName="csa_note" displayName="csa_Note" solution="Active" />
+        <Dependent type="1" schemaName="csa_note" displayName="csa_Note" />
+      </MissingDependency>
+      <MissingDependency>
+        <Required type="1" schemaName="csa_project" displayName="csa_Project" solution="Active" />
+        <Dependent type="1" schemaName="csa_project" displayName="csa_Project" />
+      </MissingDependency>
+      <MissingDependency>
+        <Required type="1" schemaName="csa_task" displayName="csa_Task" solution="Active" />
+        <Dependent type="1" schemaName="csa_task" displayName="csa_Task" />
+      </MissingDependency>
+      <MissingDependency>
+        <Required type="2" schemaName="csa_name" displayName="Name" parentSchemaName="csa_project" parentDisplayName="csa_Project" solution="Active" />
+        <Dependent type="10" schemaName="csa_project_csa_task_csa_ProjectId" displayName="csa_project_csa_task_csa_ProjectId" parentSchemaName="csa_project" parentDisplayName="csa_Project" />
+      </MissingDependency>
+      <MissingDependency>
+        <Required type="2" schemaName="csa_name" displayName="Name" parentSchemaName="csa_task" parentDisplayName="csa_Task" solution="Active" />
+        <Dependent type="10" schemaName="csa_task_csa_note_csa_TaskId" displayName="csa_task_csa_note_csa_TaskId" parentSchemaName="csa_task" parentDisplayName="csa_Task" />
+      </MissingDependency>
+    </MissingDependencies>
+  </SolutionManifest>
+</ImportExportXml>

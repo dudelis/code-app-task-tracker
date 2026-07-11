@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<EntityRelationships xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <EntityRelationship Name="business_unit_csa_customer" />
+  <EntityRelationship Name="csa_csa_task_csa_label" />
+  <EntityRelationship Name="csa_customer_csa_project_csa_CustomerId" />
+  <EntityRelationship Name="csa_project_csa_task_csa_ProjectId" />
+  <EntityRelationship Name="csa_task_csa_note_csa_TaskId" />
+  <EntityRelationship Name="lk_csa_customer_createdby" />
+  <EntityRelationship Name="lk_csa_customer_modifiedby" />
+  <EntityRelationship Name="owner_csa_customer" />
+  <EntityRelationship Name="team_csa_customer" />
+  <EntityRelationship Name="user_csa_customer" />
+</EntityRelationships>
