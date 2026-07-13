@@ -1,6 +1,6 @@
 import type { Customer } from './customers';
 import type { Project } from './projects';
-import type { Task } from './tasks';
+import { BACKLOG_STATUS, DONE_STATUS, type Task } from './tasks';
 import { Csa_taskscsa_status } from '../generated/models/Csa_tasksModel';
 
 /** A single status column on the board. */
@@ -11,8 +11,8 @@ export interface StatusColumn {
   label: string;
 }
 
-/** The `Backlog` status; also the column a task with no status falls into. */
-export const BACKLOG_STATUS = 100000000;
+/** Re-exported so board consumers can reference the Backlog/unset default. */
+export { BACKLOG_STATUS };
 
 /** Status choice values in workflow order, left to right on the board. */
 const STATUS_ORDER = [100000000, 100000001, 100000002, 100000003, 100000004] as const;
@@ -32,13 +32,34 @@ export interface StatusTransition {
 }
 
 /**
+ * Pure status-change rule shared by every board: setting a task to a new status
+ * (treating an unset status as Backlog) reports `changed: false` when it already
+ * has that status, so callers can skip a redundant write. Used by the swimlane
+ * board's drag-and-drop and the project-columns board's status dropdown alike.
+ */
+export function statusChange(task: Task, newStatus: number): StatusTransition {
+  const current = task.status ?? BACKLOG_STATUS;
+  return { changed: current !== newStatus, status: newStatus };
+}
+
+/**
  * Pure status-transition-on-drag rule: dropping a task on a column sets the
  * task's status to that column. Dropping on the task's current column (treating
- * an unset status as Backlog) is a no-op, so no write is issued.
+ * an unset status as Backlog) is a no-op, so no write is issued. Delegates to
+ * {@link statusChange} so drag and dropdown share one transition rule.
  */
 export function statusOnDrop(task: Task, targetStatus: number): StatusTransition {
-  const current = task.status ?? BACKLOG_STATUS;
-  return { changed: current !== targetStatus, status: targetStatus };
+  return statusChange(task, targetStatus);
+}
+
+/**
+ * Pure complete-from-any-view rule: marking a task complete sets its status to
+ * Done. Reports `changed: false` when the task is already Done, so a redundant
+ * write is skipped. Shared by every board's "complete" action, so the same
+ * transition logic is exercised from the swimlane board and the project board.
+ */
+export function completeChange(task: Task): StatusTransition {
+  return statusChange(task, DONE_STATUS);
 }
 
 /** Tasks for one project in one status column, sorted for display. */
@@ -102,4 +123,48 @@ export function buildCustomerBoard(
     });
 
   return { customer, columns: STATUS_COLUMNS, lanes };
+}
+
+/** One project column on the project-columns board: a project and its tasks. */
+export interface ProjectColumn {
+  project: Project;
+  tasks: Task[];
+}
+
+/** A customer's project-columns board: one column per active project. */
+export interface ProjectBoard {
+  customer: Customer;
+  columns: ProjectColumn[];
+}
+
+/**
+ * Build a customer's project-columns board: one column per active project owned
+ * by the customer, each listing that project's tasks ordered by sort order then
+ * name. Unlike the swimlane board, tasks are not split by status — the caller
+ * shows each task's status inline (e.g. a dropdown). Pure, so column membership
+ * and ordering can be tested without data access.
+ */
+export function buildProjectBoard(
+  customer: Customer,
+  projects: Project[],
+  tasks: Task[],
+): ProjectBoard {
+  const tasksByProject = new Map<string, Task[]>();
+  for (const task of tasks) {
+    const siblings = tasksByProject.get(task.projectId);
+    if (siblings) {
+      siblings.push(task);
+    } else {
+      tasksByProject.set(task.projectId, [task]);
+    }
+  }
+
+  const columns = projects
+    .filter((project) => project.active && project.customerId === customer.id)
+    .map((project) => ({
+      project,
+      tasks: [...(tasksByProject.get(project.id) ?? [])].sort(compareTasks),
+    }));
+
+  return { customer, columns };
 }

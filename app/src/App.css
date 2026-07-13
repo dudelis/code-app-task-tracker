@@ -103,3 +103,590 @@
   cursor: grabbing;
 }
 
+.project-board {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  overflow-x: auto;
+  text-align: left;
+}
+
+.project-column {
+  flex: 0 0 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.project-column-head {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.project-task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.project-task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  cursor: default;
+}
+
+.project-task-name {
+  flex: 1;
+}
+
+.project-task-status select {
+  font-size: 0.8rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.responsible-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.responsible-filter select {
+  font-size: 0.9rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.view-controls .responsible-filter {
+  margin-bottom: 0;
+}
+
+.show-inactive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.toggle-active {
+  margin-left: 0.75rem;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.5rem;
+}
+
+.inactive-badge {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid #b58900;
+  background: #fff6db;
+  color: #6b5200;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.new-customer {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.9rem;
+}
+
+.new-project {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.9rem;
+}
+
+.new-task {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.9rem;
+}
+
+.edit-customer {
+  margin-left: 0.75rem;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.5rem;
+}
+
+.edit-project {
+  margin-left: 0.75rem;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.5rem;
+}
+
+.add-project {
+  font-size: 0.8rem;
+  padding: 0.1rem 0.5rem;
+}
+
+.add-task {
+  font-size: 0.8rem;
+  padding: 0.1rem 0.5rem;
+}
+
+.board-add-task {
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.overview-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.overview-layout > section {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.detail-pane {
+  flex: 0 0 20rem;
+  align-self: stretch;
+  border: 1px solid #888;
+  border-radius: 8px;
+  background: #fbfbfb;
+  color: #1a1a1a;
+  padding: 1rem;
+  text-align: left;
+}
+
+.detail-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.detail-pane-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #1a1a1a;
+}
+
+.detail-pane-close {
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0.2rem 0.5rem;
+  background: #ececec;
+  color: #1a1a1a;
+}
+
+.detail-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  color: #1a1a1a;
+}
+
+.detail-field input[type='text'] {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.95rem;
+  border: 1px solid #999;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.detail-field input[aria-invalid='true'] {
+  border-color: #c0392b;
+}
+
+.detail-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.detail-error {
+  color: #c0392b;
+  font-size: 0.8rem;
+}
+
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.detail-save:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Shared select / date / textarea styling for detail forms (dark-theme safe). */
+.detail-field select,
+.detail-field input[type='date'],
+.detail-textarea {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.95rem;
+  border: 1px solid #999;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.detail-textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+/* Board + task detail pane side-by-side layout. */
+.board-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.board-layout > .board {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A clickable task card on the swimlane board. */
+.task-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.task-card-name {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The "complete" (mark Done) action on task cards. */
+.task-complete {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid #1e7a34;
+  border-radius: 6px;
+  background: #e6f5ea;
+  color: #14561f;
+  cursor: pointer;
+}
+
+.task-complete:hover {
+  background: #d2ecd9;
+}
+
+/* The task name in the project board becomes a button that opens the pane. */
+.project-task-open {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Label picker in the task detail pane. */
+.detail-labels {
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem 0.75rem;
+  margin: 0;
+}
+.detail-labels legend {
+  padding: 0 0.35rem;
+  font-size: 0.85rem;
+  color: #444;
+}
+.detail-labels-empty {
+  margin: 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+.detail-labels-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid #c2c2c2;
+  border-radius: 999px;
+  background: #f4f4f4;
+  color: #1a1a1a;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.label-chip input {
+  margin: 0;
+}
+.label-chip-on {
+  background: #1a5fb4;
+  border-color: #1a5fb4;
+  color: #ffffff;
+}
+
+/* Dated note timeline in the task detail pane. */
+.detail-notes {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #d0d0d0;
+  text-align: left;
+}
+.detail-notes h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: #1a1a1a;
+}
+.detail-note-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.detail-add-note {
+  align-self: flex-end;
+}
+.detail-add-note:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.detail-notes-empty {
+  margin: 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+.detail-notes-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.detail-note {
+  border: 1px solid #e0e0e0;
+  border-left: 3px solid #1a5fb4;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  background: #ffffff;
+}
+.detail-note-time {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+.detail-note-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #1a1a1a;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.detail-note-delete {
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  color: #a51d2d;
+  background: none;
+  border: 1px solid #e0c0c4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.detail-note-delete:hover:not(:disabled) {
+  background: #fbe9eb;
+}
+.detail-note-delete:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.detail-danger {
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid #eee;
+}
+.detail-danger-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: #5c5c5c;
+}
+.detail-delete-confirm {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+.detail-delete {
+  padding: 0.4rem 0.8rem;
+  color: #ffffff;
+  background: #a51d2d;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.detail-delete:hover:not(:disabled) {
+  background: #8a1824;
+}
+.detail-delete:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.label-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+.label-chips .label-chip {
+  cursor: default;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.75rem;
+}
+.label-color-red {
+  background: #e01b24;
+  border-color: #e01b24;
+  color: #ffffff;
+}
+.label-color-orange {
+  background: #ff7800;
+  border-color: #ff7800;
+  color: #1a1a1a;
+}
+.label-color-yellow {
+  background: #f6d32d;
+  border-color: #f6d32d;
+  color: #1a1a1a;
+}
+.label-color-green {
+  background: #2ec27e;
+  border-color: #2ec27e;
+  color: #1a1a1a;
+}
+.label-color-blue {
+  background: #3584e4;
+  border-color: #3584e4;
+  color: #ffffff;
+}
+.label-color-purple {
+  background: #9141ac;
+  border-color: #9141ac;
+  color: #ffffff;
+}
+.label-color-gray {
+  background: #9a9996;
+  border-color: #9a9996;
+  color: #1a1a1a;
+}
+.label-color-none {
+  background: #f4f4f4;
+  border-color: #c2c2c2;
+  color: #1a1a1a;
+}
+
+/* Inline "add or create a label" row inside the task detail label picker. */
+.detail-label-add {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.detail-label-add-input {
+  flex: 1;
+  min-width: 0;
+}
+.detail-label-add-button {
+  white-space: nowrap;
+}
+
+/* Labels management view. */
+.labels-view {
+  max-width: 640px;
+}
+.labels-view-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.labels-back {
+  cursor: pointer;
+}
+.labels-empty {
+  color: #666;
+}
+.label-create-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0 1rem;
+}
+.label-create-form input[type='text'] {
+  flex: 1;
+  min-width: 0;
+}
+.labels-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.label-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.label-row input[type='text'] {
+  flex: 1;
+  min-width: 8rem;
+}
+

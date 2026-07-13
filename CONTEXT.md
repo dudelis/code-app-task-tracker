@@ -25,8 +25,12 @@ Whether a Customer or a Project is currently being worked. Inactive ones can be 
 _Avoid_: Archived, closed, on hold, paused
 
 **Bucket**:
-A UI-only word for a column on a board. Not its own concept — a bucket represents either a Status (swimlane board) or a Project (project board) depending on the view.
-_Avoid_: Use Status or Project instead, whichever the column actually represents.
+A UI-only word for a vertical column on the board. Each Bucket is a Status; a Task moves horizontally between Buckets as its Status changes. Not its own concept — the underlying concept is always Status.
+_Avoid_: Column; do not use Bucket for a Project grouping (that is a Swimlane).
+
+**Swimlane**:
+A UI-only word for a horizontal row on the board. Each Swimlane is one Project; every Task in the row belongs to that Project. Not its own concept — the underlying concept is always Project.
+_Avoid_: Row, lane, track.
 
 **Label**:
 A reusable tag attached to a Task to classify it (e.g., Urgent, Not urgent, Important, Not important). A Task can carry several Labels at once. Labels are shared globally — the same set is reused across every Customer and Project so work can be filtered consistently everywhere.

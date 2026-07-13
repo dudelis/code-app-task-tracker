@@ -28,6 +28,16 @@
           "entitySetName": "csa_tasks",
           "logicalName": "csa_task",
           "isHidden": false
+        },
+        "csa_labels": {
+          "entitySetName": "csa_labels",
+          "logicalName": "csa_label",
+          "isHidden": false
+        },
+        "csa_notes": {
+          "entitySetName": "csa_notes",
+          "logicalName": "csa_note",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

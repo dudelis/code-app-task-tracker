@@ -12,6 +12,20 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "csa_labels": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "csa_labelid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "csa_notes": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "csa_noteid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "csa_projects": {
     "tableId": "",
     "version": "",

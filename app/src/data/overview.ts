@@ -1,6 +1,7 @@
 import type { Customer } from './customers';
 import type { Project } from './projects';
 import { isNotDone, type Task } from './tasks';
+import { isVisible } from './visibility';
 
 /** A project with its not-done tasks nested beneath it, for the overview tree. */
 export interface ProjectTreeNode {
@@ -15,19 +16,19 @@ export interface CustomerTreeNode {
 }
 
 /**
- * Build the default Customer → Project → Task overview tree.
+ * Build the Customer → Project → Task overview tree.
  *
- * Default filter: only active customers appear, only active projects are nested
- * under their owning customer, and only not-done tasks are nested under their
- * owning project. This is a pure function so the default-filter logic can be
- * tested independently of data access; the seams already request active-only
- * and not-done, but enforcing it here keeps the view correct regardless of what
- * the data source returns.
+ * Visibility: inactive customers and projects are hidden by default; passing
+ * `showInactive` reveals them. Only not-done tasks are nested under their
+ * owning project. This is a pure function so the visibility logic can be tested
+ * independently of data access; the callers load every customer and project so
+ * the toggle can reveal inactive ones without re-fetching.
  */
 export function buildOverviewTree(
   customers: Customer[],
   projects: Project[],
   tasks: Task[],
+  showInactive = false,
 ): CustomerTreeNode[] {
   const notDoneTasksByProject = new Map<string, Task[]>();
   for (const task of tasks) {
@@ -40,25 +41,25 @@ export function buildOverviewTree(
     }
   }
 
-  const activeProjectNodesByCustomer = new Map<string, ProjectTreeNode[]>();
+  const projectNodesByCustomer = new Map<string, ProjectTreeNode[]>();
   for (const project of projects) {
-    if (!project.active) continue;
+    if (!isVisible(project, showInactive)) continue;
     const node: ProjectTreeNode = {
       project,
       tasks: notDoneTasksByProject.get(project.id) ?? [],
     };
-    const siblings = activeProjectNodesByCustomer.get(project.customerId);
+    const siblings = projectNodesByCustomer.get(project.customerId);
     if (siblings) {
       siblings.push(node);
     } else {
-      activeProjectNodesByCustomer.set(project.customerId, [node]);
+      projectNodesByCustomer.set(project.customerId, [node]);
     }
   }
 
   return customers
-    .filter((customer) => customer.active)
+    .filter((customer) => isVisible(customer, showInactive))
     .map((customer) => ({
       customer,
-      projects: activeProjectNodesByCustomer.get(customer.id) ?? [],
+      projects: projectNodesByCustomer.get(customer.id) ?? [],
     }));
 }

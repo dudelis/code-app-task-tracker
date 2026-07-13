@@ -134,4 +134,29 @@ describe('buildOverviewTree', () => {
     expect(tree).toHaveLength(1);
     expect(tree[0].projects).toEqual([{ project: projects[0], tasks: [] }]);
   });
+
+  it('reveals inactive customers when showInactive is set', () => {
+    const customers = [
+      customer({ id: 'c1', name: 'Acme', active: true }),
+      customer({ id: 'c2', name: 'Beta', active: false }),
+    ];
+    const projects = [project({ id: 'p1', customerId: 'c2' })];
+
+    const tree = buildOverviewTree(customers, projects, [], true);
+
+    expect(tree.map((node) => node.customer.id)).toEqual(['c1', 'c2']);
+  });
+
+  it('reveals inactive projects under a customer when showInactive is set', () => {
+    const customers = [customer({ id: 'c1' })];
+    const projects = [
+      project({ id: 'p1', customerId: 'c1', active: true }),
+      project({ id: 'p2', customerId: 'c1', active: false }),
+    ];
+
+    expect(buildOverviewTree(customers, projects, [], true)[0].projects).toEqual([
+      { project: projects[0], tasks: [] },
+      { project: projects[1], tasks: [] },
+    ]);
+  });
 });
