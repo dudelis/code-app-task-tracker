@@ -18,6 +18,16 @@
           "entitySetName": "csa_customers",
           "logicalName": "csa_customer",
           "isHidden": false
+        },
+        "csa_projects": {
+          "entitySetName": "csa_projects",
+          "logicalName": "csa_project",
+          "isHidden": false
+        },
+        "csa_tasks": {
+          "entitySetName": "csa_tasks",
+          "logicalName": "csa_task",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

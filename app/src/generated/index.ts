@@ -6,6 +6,10 @@
 // Models
 export * as CommonModels from './models/CommonModels';
 export * as Csa_customersModel from './models/Csa_customersModel';
+export * as Csa_projectsModel from './models/Csa_projectsModel';
+export * as Csa_tasksModel from './models/Csa_tasksModel';
 
 // Services
 export * from './services/Csa_customersService';
+export * from './services/Csa_projectsService';
+export * from './services/Csa_tasksService';

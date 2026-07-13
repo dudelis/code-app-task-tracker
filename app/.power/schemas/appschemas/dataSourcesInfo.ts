@@ -11,5 +11,19 @@ export const dataSourcesInfo = {
     "primaryKey": "csa_customerid",
     "dataSourceType": "Dataverse",
     "apis": {}
+  },
+  "csa_projects": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "csa_projectid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "csa_tasks": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "csa_taskid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
   }
 };
