@@ -5,10 +5,13 @@ import {
   DONE_STATUS,
   NOT_DONE_TASKS_FILTER,
   fetchNotDoneTasks,
+  fetchAllTasks,
   isNotDone,
   mapTask,
   selectNotDoneTasks,
+  updateTaskStatus,
   type Task,
+  type TaskUpdater,
   type TasksFetcher,
 } from './tasks';
 
@@ -127,3 +130,38 @@ describe('fetchNotDoneTasks', () => {
     expect(await fetchNotDoneTasks(fetch)).toEqual([]);
   });
 });
+
+describe('fetchAllTasks', () => {
+  it('reads every status, ordered by sort then name, without a filter', async () => {
+    const fetch: TasksFetcher = vi.fn(async () =>
+      ok([
+        record({ csa_taskid: 't1', csa_name: 'A', csa_status: 100000001, _csa_projectid_value: 'p1', csa_sortorder: 1 }),
+        record({ csa_taskid: 't2', csa_name: 'Done', csa_status: DONE_STATUS, _csa_projectid_value: 'p1', csa_sortorder: 2 }),
+      ]),
+    );
+
+    const tasks = await fetchAllTasks(fetch);
+
+    expect(fetch).toHaveBeenCalledWith({ orderBy: ['csa_sortorder asc', 'csa_name asc'] });
+    expect(tasks).toEqual([
+      { id: 't1', name: 'A', status: 100000001, statusLabel: 'ToDo', projectId: 'p1', sortOrder: 1 },
+      { id: 't2', name: 'Done', status: DONE_STATUS, statusLabel: 'Done', projectId: 'p1', sortOrder: 2 },
+    ]);
+  });
+
+  it('returns an empty list when the data source yields no data', async () => {
+    const fetch: TasksFetcher = vi.fn(async () => ({}) as IOperationResult<Csa_tasks[]>);
+    expect(await fetchAllTasks(fetch)).toEqual([]);
+  });
+});
+
+describe('updateTaskStatus', () => {
+  it('persists the new status choice through the write seam', async () => {
+    const update: TaskUpdater = vi.fn(async () => ({}) as IOperationResult<Csa_tasks>);
+
+    await updateTaskStatus(update, 't1', DONE_STATUS);
+
+    expect(update).toHaveBeenCalledWith('t1', { csa_status: DONE_STATUS });
+  });
+});
+
