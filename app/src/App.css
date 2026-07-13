@@ -1,8 +1,17 @@
+/* The MUI shell (AppBar + permanent Drawer + main) is full-width and
+   left-aligned; neutralise the Vite starter's centered, max-width #root and the
+   body flex-centering from index.css so the shell can fill the viewport. */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  width: 100%;
+  text-align: left;
+}
+
+body {
+  display: block;
+  place-items: normal;
 }
 
 .logo {
@@ -159,38 +168,6 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.responsible-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-}
-
-.responsible-filter select {
-  font-size: 0.9rem;
-  padding: 0.2rem 0.4rem;
-}
-
-.view-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-.view-controls .responsible-filter {
-  margin-bottom: 0;
-}
-
-.show-inactive {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.9rem;
 }
 
 .toggle-active {

@@ -69,6 +69,21 @@ export function isNotDone(task: Task): boolean {
   return task.status !== DONE_STATUS;
 }
 
+/**
+ * Pure overdue rule for a task's due date, relative to `today` (both as
+ * `YYYY-MM-DD` strings; only the date portion of `duedate` is compared, so a
+ * datetime value is tolerated). A task is overdue when it has a due date
+ * strictly before `today` and is not yet Done — due today is not overdue, and a
+ * Done task is never overdue. Keeping this pure lets the board highlight overdue
+ * cards without embedding date logic in the component.
+ */
+export function isOverdue(task: Task, today: string): boolean {
+  if (task.status === DONE_STATUS) return false;
+  const due = task.duedate?.slice(0, 10);
+  if (!due) return false;
+  return due < today;
+}
+
 /** Project records to the UI shape and keep only not-done tasks. */
 export function selectNotDoneTasks(records: Csa_tasks[]): Task[] {
   return records.map(mapTask).filter(isNotDone);
@@ -154,6 +169,37 @@ export function newTaskForm(projectId = '', status: number = BACKLOG_STATUS): Ta
   return { name: '', status, responsible: null, duedate: '', description: '', projectId };
 }
 
+/**
+ * User-entered fields for the inline per-bucket quick-add: `name` is required,
+ * `duedate` and `responsible` are optional. A thin input the board's quick-add
+ * composer collects before composing full form values.
+ */
+export interface QuickAddTaskInput {
+  name: string;
+  duedate?: string;
+  responsible?: number | null;
+}
+
+/**
+ * Compose Task form values for the inline quick-add on a board bucket: start
+ * from {@link newTaskForm} — which defaults the owning Project from the swimlane
+ * and the Status from the originating bucket — then overlay the quick-add inputs
+ * (name, plus optional due date and responsible). Pure, so the bucket
+ * context-defaulting and name-required validation can be tested without the UI.
+ */
+export function quickAddTaskForm(
+  projectId: string,
+  status: number,
+  input: QuickAddTaskInput,
+): TaskFormValues {
+  return {
+    ...newTaskForm(projectId, status),
+    name: input.name,
+    duedate: input.duedate ?? '',
+    responsible: input.responsible ?? null,
+  };
+}
+
 /** Project an existing task into editable form values. */
 export function taskToForm(task: Task): TaskFormValues {
   return {
@@ -165,8 +211,6 @@ export function taskToForm(task: Task): TaskFormValues {
     projectId: task.projectId,
   };
 }
-
-/** Pure validation for the Task form. Name and Project are both required. */
 export function validateTaskForm(values: TaskFormValues): TaskFormErrors {
   const errors: TaskFormErrors = {};
   if (values.name.trim() === '') {
@@ -231,8 +275,11 @@ export async function createTask(
 /**
  * Persist a task's edited fields through the write seam and return the merged UI
  * projection. The name is trimmed; an unassigned responsible and a blank due
- * date are sent as `null` so Dataverse clears them. The original task carries
- * fields the form does not edit (project, sort order) into the returned value.
+ * date are sent as `null` so Dataverse clears them. When the form's `projectId`
+ * differs from the task's current owner the task is reassigned via the Project
+ * lookup `@odata.bind`; otherwise the project is left untouched. The original
+ * task carries fields the form does not edit (sort order) into the returned
+ * value.
  */
 export async function updateTask(
   update: TaskUpdater,
@@ -243,12 +290,17 @@ export async function updateTask(
   const duedate = values.duedate.trim() === '' ? null : values.duedate;
   const responsible = values.responsible;
   const description = values.description;
+  // Reassign the owning Project only when a non-empty choice differs from the
+  // current one, sending the lookup as an `@odata.bind` (mirrors createTask).
+  const projectId = values.projectId.trim();
+  const projectChanged = projectId !== '' && projectId !== task.projectId;
   const changedFields = {
     csa_name: name,
     csa_status: values.status,
     csa_responsible: responsible,
     csa_duedate: duedate,
     csa_description: description,
+    ...(projectChanged ? { 'csa_ProjectId@odata.bind': projectBind(projectId) } : {}),
   } as Partial<Omit<Csa_tasksBase, 'csa_taskid'>>;
   await update(task.id, changedFields);
   return {
@@ -256,6 +308,7 @@ export async function updateTask(
     name,
     status: values.status,
     statusLabel: statusLabel(values.status),
+    projectId: projectChanged ? projectId : task.projectId,
     responsible: responsible ?? undefined,
     duedate: duedate ?? undefined,
     description,

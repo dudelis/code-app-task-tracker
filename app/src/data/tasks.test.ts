@@ -11,9 +11,11 @@ import {
   fetchNotDoneTasks,
   fetchAllTasks,
   isNotDone,
+  isOverdue,
   mapTask,
   newTaskForm,
   projectBind,
+  quickAddTaskForm,
   selectNotDoneTasks,
   taskToForm,
   updateTask,
@@ -95,6 +97,39 @@ describe('isNotDone', () => {
 
   it('keeps tasks with no status set', () => {
     expect(isNotDone(task({ status: undefined }))).toBe(true);
+  });
+});
+
+describe('isOverdue', () => {
+  function task(partial: Partial<Task>): Task {
+    return { id: 't', name: '', statusLabel: '', projectId: '', sortOrder: 0, ...partial };
+  }
+
+  const today = '2026-07-13';
+
+  it('is true when the due date is before today and the task is not Done', () => {
+    expect(isOverdue(task({ status: 100000001, duedate: '2026-07-12' }), today)).toBe(true);
+  });
+
+  it('is false on the due date itself (due today is not overdue)', () => {
+    expect(isOverdue(task({ status: 100000001, duedate: '2026-07-13' }), today)).toBe(false);
+  });
+
+  it('is false for a future due date', () => {
+    expect(isOverdue(task({ status: 100000001, duedate: '2026-07-14' }), today)).toBe(false);
+  });
+
+  it('is false when the task is Done, even if the due date has passed', () => {
+    expect(isOverdue(task({ status: DONE_STATUS, duedate: '2026-07-01' }), today)).toBe(false);
+  });
+
+  it('is false when no due date is set', () => {
+    expect(isOverdue(task({ status: 100000001, duedate: undefined }), today)).toBe(false);
+  });
+
+  it('compares only the date portion of a datetime due value', () => {
+    expect(isOverdue(task({ status: 100000001, duedate: '2026-07-12T23:59:00Z' }), today)).toBe(true);
+    expect(isOverdue(task({ status: 100000001, duedate: '2026-07-13T00:00:00Z' }), today)).toBe(false);
   });
 });
 
@@ -253,6 +288,52 @@ describe('newTaskForm', () => {
 describe('projectBind', () => {
   it('builds the OData bind path for a project lookup', () => {
     expect(projectBind('p1')).toBe('/csa_projects(p1)');
+  });
+});
+
+describe('quickAddTaskForm', () => {
+  it('defaults the project from the swimlane and the status from the bucket', () => {
+    const values = quickAddTaskForm('p3', 100000002, { name: 'Draft outline' });
+    expect(values.projectId).toBe('p3');
+    expect(values.status).toBe(100000002);
+  });
+
+  it('overrides the name and defaults the optional fields when they are omitted', () => {
+    expect(quickAddTaskForm('p1', BACKLOG_STATUS, { name: 'Quick task' })).toEqual({
+      name: 'Quick task',
+      status: BACKLOG_STATUS,
+      responsible: null,
+      duedate: '',
+      description: '',
+      projectId: 'p1',
+    });
+  });
+
+  it('carries an optional due date and responsible through when supplied', () => {
+    expect(
+      quickAddTaskForm('p9', 100000003, {
+        name: 'Follow up',
+        duedate: '2026-12-01',
+        responsible: 100000001,
+      }),
+    ).toEqual({
+      name: 'Follow up',
+      status: 100000003,
+      responsible: 100000001,
+      duedate: '2026-12-01',
+      description: '',
+      projectId: 'p9',
+    });
+  });
+
+  it('produces values that fail name-required validation when the name is blank', () => {
+    const values = quickAddTaskForm('p1', BACKLOG_STATUS, { name: '   ' });
+    expect(validateTaskForm(values)).toEqual({ name: 'Name is required.' });
+  });
+
+  it('produces values that pass validation once a name and project are present', () => {
+    const values = quickAddTaskForm('p1', BACKLOG_STATUS, { name: 'Named' });
+    expect(validateTaskForm(values)).toEqual({});
   });
 });
 
@@ -415,6 +496,53 @@ describe('updateTask', () => {
     expect(saved.responsible).toBeUndefined();
     expect(saved.duedate).toBeUndefined();
     expect(saved.description).toBe('');
+  });
+
+  it('rebinds the project and merges the new projectId when reassigned', async () => {
+    const update: TaskUpdater = vi.fn(async () => ({}) as IOperationResult<Csa_tasks>);
+    const original = task({ status: 100000001, projectId: 'p9' });
+
+    const saved = await updateTask(update, original, {
+      name: 'Move me',
+      status: 100000001,
+      responsible: null,
+      duedate: '',
+      description: '',
+      projectId: 'p2',
+    });
+
+    expect(update).toHaveBeenCalledWith('t1', {
+      csa_name: 'Move me',
+      csa_status: 100000001,
+      csa_responsible: null,
+      csa_duedate: null,
+      csa_description: '',
+      'csa_ProjectId@odata.bind': '/csa_projects(p2)',
+    });
+    expect(saved.projectId).toBe('p2');
+    expect(saved.statusLabel).toBe('ToDo');
+  });
+
+  it('does not rebind the project when the project is unchanged', async () => {
+    const update: TaskUpdater = vi.fn(async () => ({}) as IOperationResult<Csa_tasks>);
+    const original = task({ status: 100000001, projectId: 'p9' });
+
+    await updateTask(update, original, {
+      name: 'Stay',
+      status: 100000001,
+      responsible: null,
+      duedate: '',
+      description: '',
+      projectId: 'p9',
+    });
+
+    expect(update).toHaveBeenCalledWith('t1', {
+      csa_name: 'Stay',
+      csa_status: 100000001,
+      csa_responsible: null,
+      csa_duedate: null,
+      csa_description: '',
+    });
   });
 });
 

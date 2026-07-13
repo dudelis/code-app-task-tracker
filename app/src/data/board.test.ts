@@ -134,6 +134,31 @@ describe('buildCustomerBoard', () => {
     );
   });
 
+  it('excludes inactive projects by default (includeInactive omitted)', () => {
+    const c = customer({ id: 'c1' });
+    const projects = [
+      project({ id: 'p1', customerId: 'c1' }),
+      project({ id: 'p2', customerId: 'c1', active: false }),
+    ];
+
+    const board = buildCustomerBoard(c, projects, []);
+
+    expect(board.lanes.map((lane) => lane.project.id)).toEqual(['p1']);
+  });
+
+  it('includes inactive project lanes only when includeInactive is true', () => {
+    const c = customer({ id: 'c1' });
+    const projects = [
+      project({ id: 'p1', customerId: 'c1' }),
+      project({ id: 'p2', customerId: 'c1', active: false }),
+      project({ id: 'p3', customerId: 'c2', active: false }),
+    ];
+
+    const board = buildCustomerBoard(c, projects, [], true);
+
+    expect(board.lanes.map((lane) => lane.project.id)).toEqual(['p1', 'p2']);
+  });
+
   it('places each task in the column matching its status', () => {
     const c = customer({ id: 'c1' });
     const projects = [project({ id: 'p1', customerId: 'c1' })];

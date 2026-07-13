@@ -73,7 +73,7 @@ export interface BoardLane {
   columns: BoardCell[];
 }
 
-/** A customer's swimlane board: active project lanes × status columns. */
+/** A customer's swimlane board: project lanes × status columns. */
 export interface CustomerBoard {
   customer: Customer;
   columns: StatusColumn[];
@@ -87,16 +87,19 @@ function compareTasks(a: Task, b: Task): number {
 }
 
 /**
- * Build a customer's swimlane board: one lane per active project owned by the
- * customer, each split into the fixed status columns. Tasks are placed in the
- * column matching their status (an unset status counts as Backlog) and ordered
- * within a column by sort order then name. Pure, so placement and ordering can
- * be tested without data access.
+ * Build a customer's swimlane board: one lane per project owned by the customer,
+ * each split into the fixed status columns. Inactive projects are excluded by
+ * default (live work only); pass `includeInactive` to also show inactive project
+ * lanes (the board's Show-inactive toggle). Tasks are placed in the column
+ * matching their status (an unset status counts as Backlog) and ordered within a
+ * column by sort order then name. Pure, so placement and ordering can be tested
+ * without data access.
  */
 export function buildCustomerBoard(
   customer: Customer,
   projects: Project[],
   tasks: Task[],
+  includeInactive = false,
 ): CustomerBoard {
   const tasksByProject = new Map<string, Task[]>();
   for (const task of tasks) {
@@ -109,7 +112,10 @@ export function buildCustomerBoard(
   }
 
   const lanes = projects
-    .filter((project) => project.active && project.customerId === customer.id)
+    .filter(
+      (project) =>
+        project.customerId === customer.id && (includeInactive || project.active),
+    )
     .map((project) => {
       const projectTasks = tasksByProject.get(project.id) ?? [];
       const columns = STATUS_COLUMNS.map((column) => ({

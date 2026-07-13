@@ -1,6 +1,44 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
+import Alert from '@mui/material/Alert'
+import AppBar from '@mui/material/AppBar'
+import Avatar from '@mui/material/Avatar'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Card from '@mui/material/Card'
+import CardContent from '@mui/material/CardContent'
+import Chip from '@mui/material/Chip'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogContentText from '@mui/material/DialogContentText'
+import DialogTitle from '@mui/material/DialogTitle'
+import Divider from '@mui/material/Divider'
+import Drawer from '@mui/material/Drawer'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import IconButton from '@mui/material/IconButton'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemButton from '@mui/material/ListItemButton'
+import ListItemText from '@mui/material/ListItemText'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import Snackbar from '@mui/material/Snackbar'
+import Stack from '@mui/material/Stack'
+import Switch from '@mui/material/Switch'
+import TextField from '@mui/material/TextField'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import Toolbar from '@mui/material/Toolbar'
+import Tooltip from '@mui/material/Tooltip'
+import Typography from '@mui/material/Typography'
+import CheckIcon from '@mui/icons-material/Check'
+import CloseIcon from '@mui/icons-material/Close'
+import EventIcon from '@mui/icons-material/Event'
+import MoreVertIcon from '@mui/icons-material/MoreVert'
+import PersonIcon from '@mui/icons-material/Person'
+import AddIcon from '@mui/icons-material/Add'
 import { getClient } from '@microsoft/power-apps/data'
 import type { DataClient, IOperationOptions } from '@microsoft/power-apps/data'
 import { dataSourcesInfo } from '../.power/schemas/appschemas/dataSourcesInfo'
@@ -44,13 +82,14 @@ import {
   deleteTask,
   deleteTaskCascade,
   fetchAllTasks,
-  newTaskForm,
+  quickAddTaskForm,
   taskToForm,
   updateTask,
   updateTaskStatus,
   validateTaskForm,
   DONE_STATUS,
   RESPONSIBLE_CHOICES,
+  isOverdue,
   type Task,
   type TaskFormValues,
 } from './data/tasks'
@@ -78,17 +117,14 @@ import {
   fetchTaskNotes,
   type Note,
 } from './data/notes'
-import { buildOverviewTree } from './data/overview'
-import { toggleActive } from './data/visibility'
 import { isDeleteConfirmed } from './data/deletion'
+import { toggleActive } from './data/visibility'
 import { filterTasksByResponsible, type ResponsibleFilter } from './data/responsible'
 import {
   BACKLOG_STATUS,
   STATUS_COLUMNS,
   buildCustomerBoard,
-  buildProjectBoard,
   completeChange,
-  statusChange,
   statusOnDrop,
 } from './data/board'
 
@@ -207,12 +243,6 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'ready'; data: OverviewData }
 
-type View =
-  | { kind: 'overview' }
-  | { kind: 'board'; customerId: string }
-  | { kind: 'projectBoard'; customerId: string }
-  | { kind: 'labels' }
-
 type CustomerPane =
   | { mode: 'create' }
   | { mode: 'edit'; customer: Customer }
@@ -221,18 +251,26 @@ type ProjectPane =
   | { mode: 'create'; customerId: string }
   | { mode: 'edit'; project: Project }
 
-type TaskPane =
-  | { mode: 'create'; projectId: string; status: number }
-  | { mode: 'edit'; task: Task }
+// The Task drawer is now edit-only: inline per-bucket quick-add is the primary
+// create path, so the drawer is opened solely to edit an existing task.
+type TaskPane = { mode: 'edit'; task: Task }
 
 function App() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
-  const [view, setView] = useState<View>({ kind: 'overview' })
+  // The rail selects a Customer whose swimlane board fills the main area; the
+  // Labels management view is the one alternate screen still reachable.
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
+  const [showLabels, setShowLabels] = useState(false)
   const [responsibleFilter, setResponsibleFilter] = useState<ResponsibleFilter>('all')
   const [showInactive, setShowInactive] = useState(false)
   const [customerPane, setCustomerPane] = useState<CustomerPane | null>(null)
   const [projectPane, setProjectPane] = useState<ProjectPane | null>(null)
   const [taskPane, setTaskPane] = useState<TaskPane | null>(null)
+  // Delete targets drive the typed-name confirmation dialogs (ADR-0002); the
+  // action error surfaces optimistic Activate/Deactivate failures in a Snackbar.
+  const [customerDelete, setCustomerDelete] = useState<Customer | null>(null)
+  const [projectDelete, setProjectDelete] = useState<Project | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -324,38 +362,6 @@ function App() {
         },
       }
     })
-  }
-
-  function applyCustomerActive(customerId: string, active: boolean) {
-    setState((prev) =>
-      prev.status === 'ready'
-        ? {
-            status: 'ready',
-            data: {
-              ...prev.data,
-              customers: prev.data.customers.map((customer) =>
-                customer.id === customerId ? { ...customer, active } : customer,
-              ),
-            },
-          }
-        : prev,
-    )
-  }
-
-  function applyProjectActive(projectId: string, active: boolean) {
-    setState((prev) =>
-      prev.status === 'ready'
-        ? {
-            status: 'ready',
-            data: {
-              ...prev.data,
-              projects: prev.data.projects.map((project) =>
-                project.id === projectId ? { ...project, active } : project,
-              ),
-            },
-          }
-        : prev,
-    )
   }
 
   function applyCustomerUpsert(customer: Customer) {
@@ -502,335 +508,14 @@ function App() {
     setTaskPane(pane)
   }
 
-  return (
-    <main className="app">
-      <h1>Task Tracker</h1>
-      {state.status === 'loading' && <p>Loading…</p>}
-      {state.status === 'error' && <p role="alert">Could not load data: {state.message}</p>}
-      {state.status === 'ready' && (
-        <div className="view-controls">
-          <ResponsibleFilterControl value={responsibleFilter} onChange={setResponsibleFilter} />
-          {view.kind === 'overview' && (
-            <ShowInactiveControl value={showInactive} onChange={setShowInactive} />
-          )}
-        </div>
-      )}
-      {state.status === 'ready' && view.kind === 'overview' && (
-        <div className="top-bar">
-          <button
-            type="button"
-            className="new-customer"
-            onClick={() => openCustomerPane({ mode: 'create' })}
-          >
-            New Customer
-          </button>
-          <button
-            type="button"
-            className="new-project"
-            onClick={() => openProjectPane({ mode: 'create', customerId: '' })}
-          >
-            New Project
-          </button>
-          <button
-            type="button"
-            className="new-task"
-            onClick={() => openTaskPane({ mode: 'create', projectId: '', status: BACKLOG_STATUS })}
-          >
-            New Task
-          </button>
-          <button
-            type="button"
-            className="manage-labels"
-            onClick={() => {
-              setTaskPane(null)
-              setCustomerPane(null)
-              setProjectPane(null)
-              setView({ kind: 'labels' })
-            }}
-          >
-            Manage Labels
-          </button>
-        </div>
-      )}
-      {state.status === 'ready' && view.kind === 'overview' && (
-        <div className="overview-layout">
-          <Overview
-            data={state.data}
-            responsibleFilter={responsibleFilter}
-            showInactive={showInactive}
-            onOpenBoard={(customerId) => setView({ kind: 'board', customerId })}
-            onOpenProjectBoard={(customerId) => setView({ kind: 'projectBoard', customerId })}
-            onCustomerActiveChanged={applyCustomerActive}
-            onProjectActiveChanged={applyProjectActive}
-            onEditCustomer={(customer) => openCustomerPane({ mode: 'edit', customer })}
-            onAddProject={(customerId) => openProjectPane({ mode: 'create', customerId })}
-            onEditProject={(project) => openProjectPane({ mode: 'edit', project })}
-            onAddTask={(projectId) =>
-              openTaskPane({ mode: 'create', projectId, status: BACKLOG_STATUS })
-            }
-          />
-          {customerPane && (
-            <CustomerDetailPane
-              key={customerPane.mode === 'edit' ? customerPane.customer.id : 'new-customer'}
-              pane={customerPane}
-              onClose={() => setCustomerPane(null)}
-              onSaved={(customer) => {
-                applyCustomerUpsert(customer)
-                setCustomerPane(null)
-              }}
-              onDeleted={(customerId) => {
-                applyCustomerRemove(customerId)
-                setCustomerPane(null)
-              }}
-            />
-          )}
-          {projectPane && (
-            <ProjectDetailPane
-              key={projectPane.mode === 'edit' ? projectPane.project.id : 'new-project'}
-              pane={projectPane}
-              customers={state.data.customers}
-              onClose={() => setProjectPane(null)}
-              onSaved={(project) => {
-                applyProjectUpsert(project)
-                setProjectPane(null)
-              }}
-              onDeleted={(projectId) => {
-                applyProjectRemove(projectId)
-                setProjectPane(null)
-              }}
-            />
-          )}
-          {taskPane && (
-            <TaskDetailPane
-              key={taskPane.mode === 'edit' ? taskPane.task.id : 'new-task'}
-              pane={taskPane}
-              projects={state.data.projects}
-              customers={state.data.customers}
-              allLabels={state.data.labels}
-              attachedLabelIds={
-                taskPane.mode === 'edit'
-                  ? (state.data.taskLabels[taskPane.task.id] ?? []).map((l) => l.id)
-                  : []
-              }
-              onClose={() => setTaskPane(null)}
-              onSaved={(task) => {
-                applyTaskUpsert(task)
-                setTaskPane({ mode: 'edit', task })
-              }}
-              onLabelsSaved={applyTaskLabels}
-              onLabelCreated={applyLabelUpsert}
-              onDeleted={(taskId) => {
-                applyTaskRemove(taskId)
-                setTaskPane(null)
-              }}
-            />
-          )}
-        </div>
-      )}
-      {state.status === 'ready' && view.kind === 'board' && (
-        <div className="board-layout">
-          <Board
-            data={state.data}
-            customerId={view.customerId}
-            responsibleFilter={responsibleFilter}
-            onBack={() => {
-              setView({ kind: 'overview' })
-              setTaskPane(null)
-            }}
-            onTaskStatusChanged={applyTaskStatus}
-            onSelectTask={(task) => openTaskPane({ mode: 'edit', task })}
-            onAddTask={(projectId, status) => openTaskPane({ mode: 'create', projectId, status })}
-          />
-          {taskPane && (
-            <TaskDetailPane
-              key={taskPane.mode === 'edit' ? taskPane.task.id : 'new-task'}
-              pane={taskPane}
-              projects={state.data.projects}
-              customers={state.data.customers}
-              allLabels={state.data.labels}
-              attachedLabelIds={
-                taskPane.mode === 'edit'
-                  ? (state.data.taskLabels[taskPane.task.id] ?? []).map((l) => l.id)
-                  : []
-              }
-              onClose={() => setTaskPane(null)}
-              onSaved={(task) => {
-                applyTaskUpsert(task)
-                setTaskPane({ mode: 'edit', task })
-              }}
-              onLabelsSaved={applyTaskLabels}
-              onLabelCreated={applyLabelUpsert}
-              onDeleted={(taskId) => {
-                applyTaskRemove(taskId)
-                setTaskPane(null)
-              }}
-            />
-          )}
-        </div>
-      )}
-      {state.status === 'ready' && view.kind === 'projectBoard' && (
-        <div className="board-layout">
-          <ProjectBoard
-            data={state.data}
-            customerId={view.customerId}
-            responsibleFilter={responsibleFilter}
-            onBack={() => {
-              setView({ kind: 'overview' })
-              setTaskPane(null)
-            }}
-            onTaskStatusChanged={applyTaskStatus}
-            onSelectTask={(task) => openTaskPane({ mode: 'edit', task })}
-            onAddTask={(projectId) =>
-              openTaskPane({ mode: 'create', projectId, status: BACKLOG_STATUS })
-            }
-          />
-          {taskPane && (
-            <TaskDetailPane
-              key={taskPane.mode === 'edit' ? taskPane.task.id : 'new-task'}
-              pane={taskPane}
-              projects={state.data.projects}
-              customers={state.data.customers}
-              allLabels={state.data.labels}
-              attachedLabelIds={
-                taskPane.mode === 'edit'
-                  ? (state.data.taskLabels[taskPane.task.id] ?? []).map((l) => l.id)
-                  : []
-              }
-              onClose={() => setTaskPane(null)}
-              onSaved={(task) => {
-                applyTaskUpsert(task)
-                setTaskPane({ mode: 'edit', task })
-              }}
-              onLabelsSaved={applyTaskLabels}
-              onLabelCreated={applyLabelUpsert}
-              onDeleted={(taskId) => {
-                applyTaskRemove(taskId)
-                setTaskPane(null)
-              }}
-            />
-          )}
-        </div>
-      )}
-      {state.status === 'ready' && view.kind === 'labels' && (
-        <LabelsView
-          labels={state.data.labels}
-          onBack={() => setView({ kind: 'overview' })}
-          onLabelUpserted={applyLabelUpsert}
-          onLabelRemoved={applyLabelRemove}
-        />
-      )}
-    </main>
-  )
-}
-
-const RESPONSIBLE_OPTIONS: { value: ResponsibleFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'me', label: 'Me' },
-  { value: 'customer', label: 'Customer' },
-]
-
-function ResponsibleFilterControl({
-  value,
-  onChange,
-}: {
-  value: ResponsibleFilter
-  onChange: (value: ResponsibleFilter) => void
-}) {
-  return (
-    <label className="responsible-filter">
-      <span>Responsible</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value as ResponsibleFilter)}
-      >
-        {RESPONSIBLE_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
-function ShowInactiveControl({
-  value,
-  onChange,
-}: {
-  value: boolean
-  onChange: (value: boolean) => void
-}) {
-  return (
-    <label className="show-inactive">
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span>Show inactive</span>
-    </label>
-  )
-}
-
-function LabelChips({ labels }: { labels: Label[] | undefined }) {
-  if (!labels || labels.length === 0) return null
-  return (
-    <span className="label-chips">
-      {labels.map((label) => (
-        <span
-          key={label.id}
-          className={`label-chip label-color-${label.colorLabel.toLowerCase() || 'none'}`}
-        >
-          {label.name}
-        </span>
-      ))}
-    </span>
-  )
-}
-
-function Overview({
-  data,
-  responsibleFilter,
-  showInactive,
-  onOpenBoard,
-  onOpenProjectBoard,
-  onCustomerActiveChanged,
-  onProjectActiveChanged,
-  onEditCustomer,
-  onAddProject,
-  onEditProject,
-  onAddTask,
-}: {
-  data: OverviewData
-  responsibleFilter: ResponsibleFilter
-  showInactive: boolean
-  onOpenBoard: (customerId: string) => void
-  onOpenProjectBoard: (customerId: string) => void
-  onCustomerActiveChanged: (customerId: string, active: boolean) => void
-  onProjectActiveChanged: (projectId: string, active: boolean) => void
-  onEditCustomer: (customer: Customer) => void
-  onAddProject: (customerId: string) => void
-  onEditProject: (project: Project) => void
-  onAddTask: (projectId: string) => void
-}) {
-  const [error, setError] = useState<string | null>(null)
-
-  const tree = useMemo(
-    () =>
-      buildOverviewTree(
-        data.customers,
-        data.projects,
-        filterTasksByResponsible(data.tasks, responsibleFilter),
-        showInactive,
-      ),
-    [data, responsibleFilter, showInactive],
-  )
-
-  async function toggleCustomer(customer: Customer) {
+  /**
+   * One-click Activate/Deactivate for a Customer from its ⋯ menu: optimistically
+   * flip the local record, then persist through the existing active-only write
+   * seam. Revert and surface the error in the Snackbar if the write fails.
+   */
+  async function handleToggleCustomerActive(customer: Customer) {
     const next = toggleActive(customer.active)
-    setError(null)
-    // Optimistic update; revert if the write fails.
-    onCustomerActiveChanged(customer.id, next)
+    applyCustomerUpsert({ ...customer, active: next })
     try {
       await updateCustomerActive(
         (id, changedFields) => Csa_customersService.update(id, changedFields),
@@ -838,16 +523,19 @@ function Overview({
         next,
       )
     } catch (e: unknown) {
-      onCustomerActiveChanged(customer.id, customer.active)
-      setError(e instanceof Error ? e.message : 'Could not change the customer state.')
+      applyCustomerUpsert(customer)
+      setActionError(e instanceof Error ? e.message : 'Could not update the customer.')
     }
   }
 
-  async function toggleProject(project: Project) {
+  /**
+   * One-click Activate/Deactivate for a Project from its ⋯ menu: optimistically
+   * flip the local record, then persist through the existing active-only write
+   * seam. Revert and surface the error in the Snackbar if the write fails.
+   */
+  async function handleToggleProjectActive(project: Project) {
     const next = toggleActive(project.active)
-    setError(null)
-    // Optimistic update; revert if the write fails.
-    onProjectActiveChanged(project.id, next)
+    applyProjectUpsert({ ...project, active: next })
     try {
       await updateProjectActive(
         (id, changedFields) => Csa_projectsService.update(id, changedFields),
@@ -855,149 +543,580 @@ function Overview({
         next,
       )
     } catch (e: unknown) {
-      onProjectActiveChanged(project.id, project.active)
-      setError(e instanceof Error ? e.message : 'Could not change the project state.')
+      applyProjectUpsert(project)
+      setActionError(e instanceof Error ? e.message : 'Could not update the project.')
+    }
+  }
+
+  const data = state.status === 'ready' ? state.data : null
+  // The rail lists active Customers (Microsoft Planner's "plans"); Show inactive
+  // widens it to include inactive Customers without changing the board itself.
+  const railCustomers = data
+    ? showInactive
+      ? data.customers
+      : data.customers.filter((customer) => customer.active)
+    : []
+  // Keep a valid selection: fall back to the first listed Customer when nothing
+  // is selected yet or the selected one is filtered out (e.g. after Show inactive
+  // is turned off), so the main area always has a board to show when possible.
+  const effectiveCustomerId =
+    selectedCustomerId && railCustomers.some((customer) => customer.id === selectedCustomerId)
+      ? selectedCustomerId
+      : (railCustomers[0]?.id ?? null)
+
+  return (
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <Toolbar>
+          <Typography variant="h6" component="h1" sx={{ flexGrow: 1 }}>
+            Task Tracker
+          </Typography>
+          {state.status === 'ready' && (
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={responsibleFilter}
+                onChange={(_event, next: ResponsibleFilter | null) => {
+                  if (next) setResponsibleFilter(next)
+                }}
+                aria-label="Responsible filter"
+                className="responsible-filter"
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    color: 'inherit',
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    px: 1.5,
+                  },
+                  '& .Mui-selected': {
+                    bgcolor: 'rgba(255, 255, 255, 0.16)',
+                  },
+                }}
+              >
+                {RESPONSIBLE_OPTIONS.map((option) => (
+                  <ToggleButton
+                    key={option.value}
+                    value={option.value}
+                    aria-label={`Responsible: ${option.label}`}
+                  >
+                    {option.label}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+              <FormControlLabel
+                className="show-inactive"
+                control={
+                  <Switch
+                    color="default"
+                    checked={showInactive}
+                    onChange={(event) => setShowInactive(event.target.checked)}
+                  />
+                }
+                label="Show inactive"
+              />
+              <Button
+                color="inherit"
+                className="new-project"
+                onClick={() =>
+                  openProjectPane({ mode: 'create', customerId: effectiveCustomerId ?? '' })
+                }
+              >
+                New Project
+              </Button>
+              <Button
+                color="inherit"
+                className="manage-labels"
+                onClick={() => {
+                  setTaskPane(null)
+                  setCustomerPane(null)
+                  setProjectPane(null)
+                  setShowLabels(true)
+                }}
+              >
+                Manage Labels
+              </Button>
+            </Stack>
+          )}
+        </Toolbar>
+      </AppBar>
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: RAIL_WIDTH,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': { width: RAIL_WIDTH, boxSizing: 'border-box' },
+        }}
+      >
+        <Toolbar />
+        <Box sx={{ overflow: 'auto' }}>
+          {state.status === 'ready' && (
+            <>
+              <Box sx={{ p: 1 }}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  className="new-customer"
+                  onClick={() => openCustomerPane({ mode: 'create' })}
+                >
+                  New Customer
+                </Button>
+              </Box>
+              {railCustomers.length === 0 ? (
+                <Typography color="text.secondary" sx={{ p: 2 }}>
+                  {showInactive ? 'No customers yet.' : 'No active customers yet.'}
+                </Typography>
+              ) : (
+                <List>
+                  {railCustomers.map((customer) => (
+                    <ListItem
+                      key={customer.id}
+                      disablePadding
+                      secondaryAction={
+                        <RowMenu
+                          label={customer.name}
+                          active={customer.active}
+                          onEdit={() => openCustomerPane({ mode: 'edit', customer })}
+                          onToggleActive={() => void handleToggleCustomerActive(customer)}
+                          onDelete={() => setCustomerDelete(customer)}
+                        />
+                      }
+                    >
+                      <ListItemButton
+                        selected={!showLabels && customer.id === effectiveCustomerId}
+                        onClick={() => {
+                          setShowLabels(false)
+                          setSelectedCustomerId(customer.id)
+                          setTaskPane(null)
+                        }}
+                      >
+                        <ListItemText
+                          primary={customer.name}
+                          secondary={!customer.active ? 'Inactive' : undefined}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </>
+          )}
+        </Box>
+      </Drawer>
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, p: 3 }}>
+        <Toolbar />
+        {state.status === 'loading' && <Typography>Loading…</Typography>}
+        {state.status === 'error' && (
+          <Alert severity="error">Could not load data: {state.message}</Alert>
+        )}
+        {state.status === 'ready' && (
+          <>
+            <div className="board-layout">
+              {showLabels ? (
+                <LabelsView
+                  labels={state.data.labels}
+                  onBack={() => setShowLabels(false)}
+                  onLabelUpserted={applyLabelUpsert}
+                  onLabelRemoved={applyLabelRemove}
+                />
+              ) : effectiveCustomerId ? (
+                <Board
+                  data={state.data}
+                  customerId={effectiveCustomerId}
+                  responsibleFilter={responsibleFilter}
+                  showInactive={showInactive}
+                  onTaskStatusChanged={applyTaskStatus}
+                  onSelectTask={(task) => openTaskPane({ mode: 'edit', task })}
+                  onTaskCreated={applyTaskUpsert}
+                  onEditProject={(project) => openProjectPane({ mode: 'edit', project })}
+                  onToggleProjectActive={(project) => void handleToggleProjectActive(project)}
+                  onDeleteProject={(project) => setProjectDelete(project)}
+                />
+              ) : (
+                <Typography color="text.secondary">
+                  {railCustomers.length === 0
+                    ? 'No customers to show. Use New Customer to add one.'
+                    : 'Select a customer to see its board.'}
+                </Typography>
+              )}
+              {customerPane && (
+                <CustomerDetailPane
+                  key={customerPane.mode === 'edit' ? customerPane.customer.id : 'new-customer'}
+                  pane={customerPane}
+                  onClose={() => setCustomerPane(null)}
+                  onSaved={(customer) => {
+                    applyCustomerUpsert(customer)
+                    setCustomerPane(null)
+                  }}
+                />
+              )}
+              {projectPane && (
+                <ProjectDetailPane
+                  key={projectPane.mode === 'edit' ? projectPane.project.id : 'new-project'}
+                  pane={projectPane}
+                  customers={state.data.customers}
+                  onClose={() => setProjectPane(null)}
+                  onSaved={(project) => {
+                    applyProjectUpsert(project)
+                    setProjectPane(null)
+                  }}
+                />
+              )}
+              {taskPane && !showLabels && (
+                <TaskDetailPane
+                  key={taskPane.task.id}
+                  pane={taskPane}
+                  projects={state.data.projects}
+                  customers={state.data.customers}
+                  allLabels={state.data.labels}
+                  attachedLabelIds={(state.data.taskLabels[taskPane.task.id] ?? []).map(
+                    (l) => l.id,
+                  )}
+                  onClose={() => setTaskPane(null)}
+                  onSaved={(task) => {
+                    applyTaskUpsert(task)
+                    setTaskPane({ mode: 'edit', task })
+                  }}
+                  onLabelsSaved={applyTaskLabels}
+                  onLabelCreated={applyLabelUpsert}
+                  onDeleted={(taskId) => {
+                    applyTaskRemove(taskId)
+                    setTaskPane(null)
+                  }}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </Box>
+      {customerDelete && (
+        <HardDeleteDialog
+          entity="Customer"
+          name={customerDelete.name}
+          description="its projects, their tasks, and those tasks' notes and label links"
+          onCancel={() => setCustomerDelete(null)}
+          onConfirm={async () => {
+            await runCustomerCascade(customerDelete.id)
+            applyCustomerRemove(customerDelete.id)
+            setCustomerDelete(null)
+          }}
+        />
+      )}
+      {projectDelete && (
+        <HardDeleteDialog
+          entity="Project"
+          name={projectDelete.name}
+          description="its tasks, their notes and label links"
+          onCancel={() => setProjectDelete(null)}
+          onConfirm={async () => {
+            await runProjectCascade(projectDelete.id)
+            applyProjectRemove(projectDelete.id)
+            setProjectDelete(null)
+          }}
+        />
+      )}
+      <Snackbar
+        open={Boolean(actionError)}
+        autoHideDuration={6000}
+        onClose={() => setActionError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert severity="error" onClose={() => setActionError(null)} sx={{ width: '100%' }}>
+          {actionError}
+        </Alert>
+      </Snackbar>
+    </Box>
+  )
+}
+
+/** Width of the persistent left rail that lists Customers. */
+const RAIL_WIDTH = 260
+
+/** Width of the right-anchored Customer/Project/Task detail drawers. */
+const DRAWER_WIDTH = 360
+
+/** Wider width for the Task drawer, which also hosts the Notes timeline. */
+const TASK_DRAWER_WIDTH = 440
+
+/**
+ * The per-row "⋯" overflow menu shared by Customer rail rows and Project
+ * swimlane headers: Edit, Activate/Deactivate (label follows `active`), and
+ * Delete. Owns only its own anchor state; every action is a caller-supplied
+ * callback so the menu carries no create/edit/delete logic itself. The trigger
+ * stops click propagation so opening the menu never also selects the row.
+ */
+function RowMenu({
+  label,
+  active,
+  onEdit,
+  onToggleActive,
+  onDelete,
+}: {
+  label: string
+  active: boolean
+  onEdit: () => void
+  onToggleActive: () => void
+  onDelete: () => void
+}) {
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+  const close = () => setAnchorEl(null)
+  return (
+    <>
+      <IconButton
+        edge="end"
+        size="small"
+        aria-label={`Manage ${label}`}
+        aria-haspopup="true"
+        onClick={(event) => {
+          event.stopPropagation()
+          setAnchorEl(event.currentTarget)
+        }}
+      >
+        <MoreVertIcon fontSize="small" />
+      </IconButton>
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={close}>
+        <MenuItem
+          onClick={() => {
+            close()
+            onEdit()
+          }}
+        >
+          Edit
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            close()
+            onToggleActive()
+          }}
+        >
+          {active ? 'Deactivate' : 'Activate'}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            close()
+            onDelete()
+          }}
+        >
+          Delete
+        </MenuItem>
+      </Menu>
+    </>
+  )
+}
+
+/**
+ * The typed-name hard-delete confirmation (ADR-0002) re-skinned as an MUI
+ * Dialog: the Delete button stays disabled until the user types the record's
+ * exact name (`isDeleteConfirmed`). On confirm it runs the caller's cascade
+ * (`onConfirm`), which deletes the whole subtree before the record itself;
+ * errors keep the dialog open so the destructive action is never lost silently.
+ */
+function HardDeleteDialog({
+  entity,
+  name,
+  description,
+  onCancel,
+  onConfirm,
+}: {
+  entity: string
+  name: string
+  description: string
+  onCancel: () => void
+  onConfirm: () => Promise<void>
+}) {
+  const [typed, setTyped] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const lower = entity.toLowerCase()
+  const confirmed = isDeleteConfirmed(typed, name)
+
+  async function handleConfirm() {
+    if (!confirmed || deleting) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await onConfirm()
+    } catch (e: unknown) {
+      setDeleting(false)
+      setError(e instanceof Error ? e.message : `Could not delete the ${lower}.`)
     }
   }
 
   return (
-    <section>
-      <h2>Overview</h2>
-      {error && <p role="alert">{error}</p>}
-      {tree.length === 0 ? (
-        <p>{showInactive ? 'No customers yet.' : 'No active customers yet.'}</p>
-      ) : (
-        <ul className="overview-tree">
-          {tree.map((node) => (
-            <li key={node.customer.id} className="customer-node">
-              <details open>
-                <summary className="customer-name">
-                  {node.customer.name}
-                  {!node.customer.active && <span className="inactive-badge">Inactive</span>}
-                  <button
-                    type="button"
-                    className="edit-customer"
-                    aria-label={`Edit ${node.customer.name}`}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      onEditCustomer(node.customer)
-                    }}
-                  >
-                    ✎ Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="toggle-active"
-                    onClick={(event) => {
-                      event.preventDefault()
-                      void toggleCustomer(node.customer)
-                    }}
-                  >
-                    {node.customer.active ? 'Deactivate' : 'Activate'}
-                  </button>
-                  <button
-                    type="button"
-                    className="open-board"
-                    onClick={(event) => {
-                      event.preventDefault()
-                      onOpenBoard(node.customer.id)
-                    }}
-                  >
-                    Open board
-                  </button>
-                  <button
-                    type="button"
-                    className="open-board"
-                    onClick={(event) => {
-                      event.preventDefault()
-                      onOpenProjectBoard(node.customer.id)
-                    }}
-                  >
-                    Open project board
-                  </button>
-                  <button
-                    type="button"
-                    className="add-project"
-                    onClick={(event) => {
-                      event.preventDefault()
-                      onAddProject(node.customer.id)
-                    }}
-                  >
-                    + Project
-                  </button>
-                </summary>
-                {node.projects.length === 0 ? (
-                  <p className="no-projects">
-                    {showInactive ? 'No projects.' : 'No active projects.'}
-                  </p>
-                ) : (
-                  <ul className="project-list">
-                    {node.projects.map((projectNode) => (
-                      <li key={projectNode.project.id} className="project-node">
-                        <details open>
-                          <summary className="project-name">
-                            {projectNode.project.name}
-                            {!projectNode.project.active && (
-                              <span className="inactive-badge">Inactive</span>
-                            )}
-                            <button
-                              type="button"
-                              className="edit-project"
-                              aria-label={`Edit ${projectNode.project.name}`}
-                              onClick={(event) => {
-                                event.preventDefault()
-                                onEditProject(projectNode.project)
-                              }}
-                            >
-                              ✎ Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="toggle-active"
-                              onClick={(event) => {
-                                event.preventDefault()
-                                void toggleProject(projectNode.project)
-                              }}
-                            >
-                              {projectNode.project.active ? 'Deactivate' : 'Activate'}
-                            </button>
-                            <button
-                              type="button"
-                              className="add-task"
-                              onClick={(event) => {
-                                event.preventDefault()
-                                onAddTask(projectNode.project.id)
-                              }}
-                            >
-                              + Task
-                            </button>
-                          </summary>
-                          {projectNode.tasks.length === 0 ? (
-                            <p className="no-tasks">No open tasks.</p>
-                          ) : (
-                            <ul className="task-list">
-                              {projectNode.tasks.map((task) => (
-                                <li key={task.id} className="task-name">
-                                  {task.name}
-                                  {task.statusLabel && (
-                                    <span className="task-status"> — {task.statusLabel}</span>
-                                  )}
-                                  <LabelChips labels={data.taskLabels[task.id]} />
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </details>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </details>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <Dialog open onClose={deleting ? undefined : onCancel} aria-labelledby="hard-delete-title">
+      <DialogTitle id="hard-delete-title">Delete {entity}</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          Type <strong>{name}</strong> to permanently delete this {lower} and everything under it
+          ({description}). This cannot be undone.
+        </DialogContentText>
+        <TextField
+          autoFocus
+          fullWidth
+          margin="dense"
+          label={`${entity} name`}
+          value={typed}
+          aria-label={`Type the ${lower} name to confirm deletion`}
+          onChange={(event) => setTyped(event.target.value)}
+        />
+        {error && (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {error}
+          </Alert>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onCancel} disabled={deleting}>
+          Cancel
+        </Button>
+        <Button
+          color="error"
+          variant="contained"
+          disabled={!confirmed || deleting}
+          onClick={handleConfirm}
+        >
+          {deleting ? 'Deleting…' : `Delete ${entity}`}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+
+const RESPONSIBLE_OPTIONS: { value: ResponsibleFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'me', label: 'Me' },
+  { value: 'customer', label: 'Customer' },
+]
+
+/**
+ * Fill/text colours for a Label chip, keyed by the label's Dataverse colour
+ * name. Presentation-only (mirrors the palette the CSS label chips used) so the
+ * board's MUI chips read the same across every customer/project.
+ */
+const LABEL_COLOR_HEX: Record<string, { bg: string; fg: string }> = {
+  Red: { bg: '#e01b24', fg: '#ffffff' },
+  Orange: { bg: '#ff7800', fg: '#1a1a1a' },
+  Yellow: { bg: '#f6d32d', fg: '#1a1a1a' },
+  Green: { bg: '#2ec27e', fg: '#1a1a1a' },
+  Blue: { bg: '#3584e4', fg: '#ffffff' },
+  Purple: { bg: '#9141ac', fg: '#ffffff' },
+  Gray: { bg: '#9a9996', fg: '#1a1a1a' },
+}
+
+/** Resolve a task's responsible choice value to its label (Me/Customer), or null when unset. */
+function responsibleLabel(value: number | undefined): string | null {
+  if (value === undefined) return null
+  return RESPONSIBLE_CHOICES.find((choice) => choice.value === value)?.label ?? null
+}
+
+/**
+ * A single Planner-style task card on the swimlane board: the Task name, its
+ * Label chips (coloured per label), a due-date chip highlighted in error when
+ * overdue, and a Responsible badge when set. The card is natively draggable
+ * (horizontal Status change only) and clickable/keyboard-activatable to open the
+ * detail pane; the complete ✓ marks it Done. Status is deliberately omitted —
+ * it is implied by the column the card sits in.
+ */
+function TaskCard({
+  task,
+  labels,
+  overdue,
+  onSelect,
+  onComplete,
+  onDragStart,
+  onDragEnd,
+}: {
+  task: Task
+  labels: Label[] | undefined
+  overdue: boolean
+  onSelect: () => void
+  onComplete: () => void
+  onDragStart: () => void
+  onDragEnd: () => void
+}) {
+  const responsible = responsibleLabel(task.responsible)
+  const due = task.duedate?.slice(0, 10)
+  const hasMeta = Boolean((labels && labels.length > 0) || due || responsible)
+  return (
+    <Card
+      variant="outlined"
+      draggable
+      role="button"
+      tabIndex={0}
+      aria-label={task.name}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onSelect()
+        }
+      }}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      sx={{ cursor: 'grab', '&:active': { cursor: 'grabbing' } }}
+    >
+      <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+          <Typography variant="body2" sx={{ flex: 1, minWidth: 0, fontWeight: 500 }}>
+            {task.name}
+          </Typography>
+          {task.status !== DONE_STATUS && (
+            <Tooltip title={`Complete ${task.name}`}>
+              <IconButton
+                size="small"
+                aria-label={`Complete ${task.name}`}
+                sx={{ color: 'success.main', flexShrink: 0 }}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onComplete()
+                }}
+              >
+                <CheckIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+        {hasMeta && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.75 }}>
+            {labels?.map((label) => {
+              const color = LABEL_COLOR_HEX[label.colorLabel]
+              return (
+                <Chip
+                  key={label.id}
+                  size="small"
+                  label={label.name}
+                  sx={color ? { bgcolor: color.bg, color: color.fg } : undefined}
+                />
+              )
+            })}
+            {due && (
+              <Chip
+                size="small"
+                icon={<EventIcon fontSize="small" />}
+                label={due}
+                color={overdue ? 'error' : 'default'}
+                variant={overdue ? 'filled' : 'outlined'}
+                aria-label={overdue ? `Due ${due} (overdue)` : `Due ${due}`}
+              />
+            )}
+            {responsible && (
+              <Tooltip title={`Responsible: ${responsible}`}>
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  avatar={
+                    <Avatar>
+                      <PersonIcon fontSize="small" />
+                    </Avatar>
+                  }
+                  label={responsible}
+                />
+              </Tooltip>
+            )}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -1005,21 +1124,36 @@ function Board({
   data,
   customerId,
   responsibleFilter,
-  onBack,
+  showInactive,
   onTaskStatusChanged,
   onSelectTask,
-  onAddTask,
+  onTaskCreated,
+  onEditProject,
+  onToggleProjectActive,
+  onDeleteProject,
 }: {
   data: OverviewData
   customerId: string
   responsibleFilter: ResponsibleFilter
-  onBack: () => void
+  showInactive: boolean
   onTaskStatusChanged: (taskId: string, status: number) => void
   onSelectTask: (task: Task) => void
-  onAddTask: (projectId: string, status: number) => void
+  onTaskCreated: (task: Task) => void
+  onEditProject: (project: Project) => void
+  onToggleProjectActive: (project: Project) => void
+  onDeleteProject: (project: Project) => void
 }) {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Local calendar date (YYYY-MM-DD) used to decide whether a card's due date is
+  // overdue; computed once per render since the board is not open across midnight.
+  const today = useMemo(() => {
+    const now = new Date()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    return `${now.getFullYear()}-${month}-${day}`
+  }, [])
 
   const customer = data.customers.find((c) => c.id === customerId)
   const board = useMemo(
@@ -1029,17 +1163,15 @@ function Board({
             customer,
             data.projects,
             filterTasksByResponsible(data.tasks, responsibleFilter),
+            showInactive,
           )
         : null,
-    [customer, data.projects, data.tasks, responsibleFilter],
+    [customer, data.projects, data.tasks, responsibleFilter, showInactive],
   )
 
   if (!customer || !board) {
     return (
       <section>
-        <button type="button" onClick={onBack}>
-          ← Back to overview
-        </button>
         <p role="alert">That customer is no longer available.</p>
       </section>
     )
@@ -1094,14 +1226,11 @@ function Board({
   return (
     <section className="board">
       <header className="board-header">
-        <button type="button" onClick={onBack}>
-          ← Back to overview
-        </button>
         <h2>{customer.name} — Board</h2>
       </header>
       {error && <p role="alert">{error}</p>}
       {board.lanes.length === 0 ? (
-        <p>No active projects for this customer.</p>
+        <p>{showInactive ? 'No projects for this customer.' : 'No active projects for this customer.'}</p>
       ) : (
         <div className="board-grid" role="grid">
           <div className="board-row board-head" role="row">
@@ -1114,9 +1243,27 @@ function Board({
           </div>
           {board.lanes.map((lane) => (
             <div key={lane.project.id} className="board-row" role="row">
-              <div className="board-lane-head" role="rowheader">
-                {lane.project.name}
-              </div>
+              <Box
+                className="board-lane-head"
+                role="rowheader"
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 0.5,
+                }}
+              >
+                <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {lane.project.name}
+                </Box>
+                <RowMenu
+                  label={lane.project.name}
+                  active={lane.project.active}
+                  onEdit={() => onEditProject(lane.project)}
+                  onToggleActive={() => onToggleProjectActive(lane.project)}
+                  onDelete={() => onDeleteProject(lane.project)}
+                />
+              </Box>
               {lane.columns.map((cell) => (
                 <div
                   key={cell.status}
@@ -1126,47 +1273,24 @@ function Board({
                   onDrop={() => handleDrop(cell.status)}
                 >
                   {cell.tasks.map((task) => (
-                    <div
+                    <TaskCard
                       key={task.id}
-                      className="board-card task-card"
-                      draggable
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => onSelectTask(task)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault()
-                          onSelectTask(task)
-                        }
-                      }}
+                      task={task}
+                      labels={data.taskLabels[task.id]}
+                      overdue={isOverdue(task, today)}
+                      onSelect={() => onSelectTask(task)}
+                      onComplete={() => void handleComplete(task)}
                       onDragStart={() => setDraggingTaskId(task.id)}
                       onDragEnd={() => setDraggingTaskId(null)}
-                    >
-                      <span className="task-card-name">{task.name}</span>
-                      <LabelChips labels={data.taskLabels[task.id]} />
-                      {task.status !== DONE_STATUS && (
-                        <button
-                          type="button"
-                          className="task-complete"
-                          aria-label={`Complete ${task.name}`}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            void handleComplete(task)
-                          }}
-                        >
-                          ✓
-                        </button>
-                      )}
-                    </div>
+                    />
                   ))}
-                  <button
-                    type="button"
-                    className="add-task board-add-task"
-                    aria-label={`Add task to ${lane.project.name} in ${cell.label}`}
-                    onClick={() => onAddTask(lane.project.id, cell.status)}
-                  >
-                    + Task
-                  </button>
+                  <QuickAddTask
+                    projectId={lane.project.id}
+                    status={cell.status}
+                    projectName={lane.project.name}
+                    statusLabel={cell.label}
+                    onCreated={onTaskCreated}
+                  />
                 </div>
               ))}
             </div>
@@ -1177,165 +1301,156 @@ function Board({
   )
 }
 
-function ProjectBoard({
-  data,
-  customerId,
-  responsibleFilter,
-  onBack,
-  onTaskStatusChanged,
-  onSelectTask,
-  onAddTask,
+/**
+ * The Planner/Trello-style inline quick-add inside one board bucket (Project row
+ * × Status column). Collapsed to a "+ Add task" button by default; clicking it
+ * expands a small form in place — a required Name (autofocused) plus an optional
+ * Due date and Responsible — that is the primary way tasks are created. The new
+ * task defaults its Project from the swimlane and its Status from the bucket via
+ * {@link quickAddTaskForm}; Enter adds and Escape cancels. On success the created
+ * Task is handed to `onCreated` (optimistic upsert) so it appears in this bucket,
+ * and the composer stays open with the Name refocused for rapid entry.
+ */
+function QuickAddTask({
+  projectId,
+  status,
+  projectName,
+  statusLabel,
+  onCreated,
 }: {
-  data: OverviewData
-  customerId: string
-  responsibleFilter: ResponsibleFilter
-  onBack: () => void
-  onTaskStatusChanged: (taskId: string, status: number) => void
-  onSelectTask: (task: Task) => void
-  onAddTask: (projectId: string) => void
+  projectId: string
+  status: number
+  projectName: string
+  statusLabel: string
+  onCreated: (task: Task) => void
 }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [duedate, setDuedate] = useState('')
+  const [responsible, setResponsible] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
 
-  const customer = data.customers.find((c) => c.id === customerId)
-  const board = useMemo(
-    () =>
-      customer
-        ? buildProjectBoard(
-            customer,
-            data.projects,
-            filterTasksByResponsible(data.tasks, responsibleFilter),
-          )
-        : null,
-    [customer, data.projects, data.tasks, responsibleFilter],
-  )
+  function reset() {
+    setName('')
+    setDuedate('')
+    setResponsible(null)
+    setError(null)
+  }
 
-  if (!customer || !board) {
+  function cancel() {
+    reset()
+    setOpen(false)
+  }
+
+  const values = quickAddTaskForm(projectId, status, { name, duedate, responsible })
+  const errors = validateTaskForm(values)
+  const canAdd = Object.keys(errors).length === 0 && !saving
+
+  async function handleAdd() {
+    if (!canAdd) return
+    setSaving(true)
+    setError(null)
+    try {
+      const created = await createTask((record) => Csa_tasksService.create(record), values)
+      onCreated(created)
+      reset()
+      setSaving(false)
+      // Keep the composer open and refocus the name for rapid successive adds.
+      nameRef.current?.focus()
+    } catch (e: unknown) {
+      setSaving(false)
+      setError(e instanceof Error ? e.message : 'Could not add the task.')
+    }
+  }
+
+  if (!open) {
     return (
-      <section>
-        <button type="button" onClick={onBack}>
-          ← Back to overview
-        </button>
-        <p role="alert">That customer is no longer available.</p>
-      </section>
+      <Button
+        size="small"
+        className="board-add-task"
+        startIcon={<AddIcon fontSize="small" />}
+        aria-label={`Add task to ${projectName} in ${statusLabel}`}
+        onClick={() => setOpen(true)}
+        fullWidth
+        sx={{ justifyContent: 'flex-start', textTransform: 'none' }}
+      >
+        Add task
+      </Button>
     )
   }
 
-  async function handleStatusSelect(taskId: string, nextStatus: number) {
-    const task = data.tasks.find((t) => t.id === taskId)
-    if (!task) return
-
-    const transition = statusChange(task, nextStatus)
-    if (!transition.changed) return
-
-    const previousStatus = task.status ?? BACKLOG_STATUS
-    setError(null)
-    // Optimistic update; revert if the write fails.
-    onTaskStatusChanged(taskId, transition.status)
-    try {
-      await updateTaskStatus(
-        (id, changedFields) => Csa_tasksService.update(id, changedFields),
-        taskId,
-        transition.status,
-      )
-    } catch (e: unknown) {
-      onTaskStatusChanged(taskId, previousStatus)
-      setError(e instanceof Error ? e.message : 'Could not change the task status.')
-    }
-  }
-
-  async function handleComplete(task: Task) {
-    const transition = completeChange(task)
-    if (!transition.changed) return
-
-    const previousStatus = task.status ?? BACKLOG_STATUS
-    setError(null)
-    // Optimistic update; revert if the write fails.
-    onTaskStatusChanged(task.id, transition.status)
-    try {
-      await updateTaskStatus(
-        (id, changedFields) => Csa_tasksService.update(id, changedFields),
-        task.id,
-        transition.status,
-      )
-    } catch (e: unknown) {
-      onTaskStatusChanged(task.id, previousStatus)
-      setError(e instanceof Error ? e.message : 'Could not complete the task.')
-    }
-  }
-
   return (
-    <section className="board">
-      <header className="board-header">
-        <button type="button" onClick={onBack}>
-          ← Back to overview
-        </button>
-        <h2>{customer.name} — Projects</h2>
-      </header>
-      {error && <p role="alert">{error}</p>}
-      {board.columns.length === 0 ? (
-        <p>No active projects for this customer.</p>
-      ) : (
-        <div className="project-board">
-          {board.columns.map((column) => (
-            <div key={column.project.id} className="project-column">
-              <h3 className="project-column-head">
-                {column.project.name}
-                <button
-                  type="button"
-                  className="add-task"
-                  onClick={() => onAddTask(column.project.id)}
-                >
-                  + Task
-                </button>
-              </h3>
-              {column.tasks.length === 0 ? (
-                <p className="no-tasks">No tasks.</p>
-              ) : (
-                <ul className="project-task-list">
-                  {column.tasks.map((task) => (
-                    <li key={task.id} className="board-card project-task">
-                      <button
-                        type="button"
-                        className="project-task-name project-task-open"
-                        onClick={() => onSelectTask(task)}
-                      >
-                        {task.name}
-                      </button>
-                      <LabelChips labels={data.taskLabels[task.id]} />
-                      <label className="project-task-status">
-                        <span className="visually-hidden">Status for {task.name}</span>
-                        <select
-                          value={task.status ?? BACKLOG_STATUS}
-                          onChange={(event) =>
-                            handleStatusSelect(task.id, Number(event.target.value))
-                          }
-                        >
-                          {STATUS_COLUMNS.map((statusColumn) => (
-                            <option key={statusColumn.status} value={statusColumn.status}>
-                              {statusColumn.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {task.status !== DONE_STATUS && (
-                        <button
-                          type="button"
-                          className="task-complete"
-                          aria-label={`Complete ${task.name}`}
-                          onClick={() => void handleComplete(task)}
-                        >
-                          ✓
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
+    <Box
+      className="board-quick-add"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          cancel()
+        }
+      }}
+      sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}
+    >
+      {error && (
+        <Alert severity="error" sx={{ py: 0 }}>
+          {error}
+        </Alert>
       )}
-    </section>
+      <TextField
+        inputRef={nameRef}
+        size="small"
+        autoFocus
+        required
+        placeholder="Task name"
+        aria-label={`New task name for ${projectName} in ${statusLabel}`}
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            void handleAdd()
+          }
+        }}
+      />
+      <TextField
+        type="date"
+        size="small"
+        aria-label={`Due date for new task in ${statusLabel}`}
+        value={duedate}
+        slotProps={{ inputLabel: { shrink: true } }}
+        onChange={(event) => setDuedate(event.target.value)}
+      />
+      <TextField
+        select
+        size="small"
+        aria-label={`Responsible for new task in ${statusLabel}`}
+        value={responsible ?? ''}
+        onChange={(event) =>
+          setResponsible(event.target.value === '' ? null : Number(event.target.value))
+        }
+      >
+        <MenuItem value="">Unassigned</MenuItem>
+        {RESPONSIBLE_CHOICES.map((choice) => (
+          <MenuItem key={choice.value} value={choice.value}>
+            {choice.label}
+          </MenuItem>
+        ))}
+      </TextField>
+      <Stack direction="row" spacing={1}>
+        <Button
+          size="small"
+          variant="contained"
+          disabled={!canAdd}
+          onClick={() => void handleAdd()}
+        >
+          {saving ? 'Adding…' : 'Add task'}
+        </Button>
+        <Button size="small" type="button" onClick={cancel} disabled={saving}>
+          Cancel
+        </Button>
+      </Stack>
+    </Box>
   )
 }
 
@@ -1344,13 +1459,11 @@ function ProjectDetailPane({
   customers,
   onClose,
   onSaved,
-  onDeleted,
 }: {
   pane: ProjectPane
   customers: Customer[]
   onClose: () => void
   onSaved: (project: Project) => void
-  onDeleted: (projectId: string) => void
 }) {
   const isEdit = pane.mode === 'edit'
   const [values, setValues] = useState<ProjectFormValues>(() =>
@@ -1358,13 +1471,9 @@ function ProjectDetailPane({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [deleteName, setDeleteName] = useState('')
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const errors = validateProjectForm(values)
   const canSave = Object.keys(errors).length === 0
-  const confirmed = pane.mode === 'edit' && isDeleteConfirmed(deleteName, pane.project.name)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -1387,105 +1496,74 @@ function ProjectDetailPane({
     }
   }
 
-  /**
-   * Hard-delete this project and its subtree (ADR-0002), guarded by typed-name
-   * confirmation: the cascade deletes the project's tasks (and their notes and
-   * label links) before the project itself, so no orphaned children remain.
-   */
-  async function handleDelete() {
-    if (pane.mode !== 'edit' || saving || deleting || !confirmed) return
-    setDeleting(true)
-    setDeleteError(null)
-    try {
-      await runProjectCascade(pane.project.id)
-      onDeleted(pane.project.id)
-    } catch (e: unknown) {
-      setDeleting(false)
-      setDeleteError(e instanceof Error ? e.message : 'Could not delete the project.')
-    }
-  }
-
   return (
-    <aside className="detail-pane" aria-label={isEdit ? 'Edit project' : 'New project'}>
-      <header className="detail-pane-header">
-        <h2>{isEdit ? 'Edit Project' : 'New Project'}</h2>
-        <button type="button" className="detail-pane-close" aria-label="Close" onClick={onClose}>
-          ✕
-        </button>
-      </header>
-      <form className="detail-form" onSubmit={handleSubmit}>
-        {error && <p role="alert">{error}</p>}
-        <label className="detail-field">
-          <span>Name</span>
-          <input
-            type="text"
-            value={values.name}
-            autoFocus
-            aria-invalid={errors.name ? true : undefined}
-            onChange={(event) => setValues((v) => ({ ...v, name: event.target.value }))}
-          />
-          {errors.name && <span className="detail-error">{errors.name}</span>}
-        </label>
-        <label className="detail-field">
-          <span>Customer</span>
-          <select
-            value={values.customerId}
-            aria-invalid={errors.customerId ? true : undefined}
-            onChange={(event) => setValues((v) => ({ ...v, customerId: event.target.value }))}
-          >
-            <option value="">Select a customer…</option>
-            {customers.map((customer) => (
-              <option key={customer.id} value={customer.id}>
-                {customer.name}
-                {!customer.active ? ' (Inactive)' : ''}
-              </option>
-            ))}
-          </select>
-          {errors.customerId && <span className="detail-error">{errors.customerId}</span>}
-        </label>
-        <label className="detail-field detail-toggle">
-          <input
-            type="checkbox"
-            checked={values.active}
-            onChange={(event) => setValues((v) => ({ ...v, active: event.target.checked }))}
-          />
-          <span>Active</span>
-        </label>
-        <div className="detail-actions">
-          <button type="button" onClick={onClose} disabled={saving}>
+    <Drawer anchor="right" open onClose={onClose}>
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        aria-label={isEdit ? 'Edit project' : 'New project'}
+        sx={{
+          width: DRAWER_WIDTH,
+          maxWidth: '100vw',
+          p: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}
+      >
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" component="h2">
+            {isEdit ? 'Edit Project' : 'New Project'}
+          </Typography>
+          <IconButton aria-label="Close" onClick={onClose}>
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+        {error && <Alert severity="error">{error}</Alert>}
+        <TextField
+          label="Name"
+          value={values.name}
+          autoFocus
+          required
+          error={Boolean(errors.name)}
+          helperText={errors.name}
+          onChange={(event) => setValues((v) => ({ ...v, name: event.target.value }))}
+        />
+        <TextField
+          select
+          label="Customer"
+          value={values.customerId}
+          required
+          error={Boolean(errors.customerId)}
+          helperText={errors.customerId}
+          onChange={(event) => setValues((v) => ({ ...v, customerId: event.target.value }))}
+        >
+          {customers.map((customer) => (
+            <MenuItem key={customer.id} value={customer.id}>
+              {customer.name}
+              {!customer.active ? ' (Inactive)' : ''}
+            </MenuItem>
+          ))}
+        </TextField>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={values.active}
+              onChange={(event) => setValues((v) => ({ ...v, active: event.target.checked }))}
+            />
+          }
+          label="Active"
+        />
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+          <Button type="button" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
-          <button type="submit" className="detail-save" disabled={!canSave || saving}>
+          </Button>
+          <Button type="submit" variant="contained" disabled={!canSave || saving}>
             {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </form>
-      {pane.mode === 'edit' && (
-        <div className="detail-danger">
-          <p className="detail-danger-hint">
-            Type <strong>{pane.project.name}</strong> to permanently delete this project and
-            everything under it (its tasks, their notes and label links). This cannot be undone.
-          </p>
-          <input
-            type="text"
-            className="detail-delete-confirm"
-            value={deleteName}
-            placeholder="Project name"
-            aria-label="Type the project name to confirm deletion"
-            onChange={(event) => setDeleteName(event.target.value)}
-          />
-          {deleteError && <p role="alert">{deleteError}</p>}
-          <button
-            type="button"
-            className="detail-delete"
-            disabled={!confirmed || saving || deleting}
-            onClick={handleDelete}
-          >
-            {deleting ? 'Deleting…' : 'Delete Project'}
-          </button>
-        </div>
-      )}
-    </aside>
+          </Button>
+        </Stack>
+      </Box>
+    </Drawer>
   )
 }
 
@@ -1493,12 +1571,10 @@ function CustomerDetailPane({
   pane,
   onClose,
   onSaved,
-  onDeleted,
 }: {
   pane: CustomerPane
   onClose: () => void
   onSaved: (customer: Customer) => void
-  onDeleted: (customerId: string) => void
 }) {
   const isEdit = pane.mode === 'edit'
   const [values, setValues] = useState<CustomerFormValues>(() =>
@@ -1506,13 +1582,9 @@ function CustomerDetailPane({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [deleteName, setDeleteName] = useState('')
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const errors = validateCustomerForm(values)
   const canSave = Object.keys(errors).length === 0
-  const confirmed = pane.mode === 'edit' && isDeleteConfirmed(deleteName, pane.customer.name)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -1535,90 +1607,58 @@ function CustomerDetailPane({
     }
   }
 
-  /**
-   * Hard-delete this customer and its subtree (ADR-0002), guarded by typed-name
-   * confirmation: the cascade removes the customer's projects, their tasks, and
-   * those tasks' notes and label links before the customer itself, so no
-   * orphaned children remain.
-   */
-  async function handleDelete() {
-    if (pane.mode !== 'edit' || saving || deleting || !confirmed) return
-    setDeleting(true)
-    setDeleteError(null)
-    try {
-      await runCustomerCascade(pane.customer.id)
-      onDeleted(pane.customer.id)
-    } catch (e: unknown) {
-      setDeleting(false)
-      setDeleteError(e instanceof Error ? e.message : 'Could not delete the customer.')
-    }
-  }
-
   return (
-    <aside className="detail-pane" aria-label={isEdit ? 'Edit customer' : 'New customer'}>
-      <header className="detail-pane-header">
-        <h2>{isEdit ? 'Edit Customer' : 'New Customer'}</h2>
-        <button type="button" className="detail-pane-close" aria-label="Close" onClick={onClose}>
-          ✕
-        </button>
-      </header>
-      <form className="detail-form" onSubmit={handleSubmit}>
-        {error && <p role="alert">{error}</p>}
-        <label className="detail-field">
-          <span>Name</span>
-          <input
-            type="text"
-            value={values.name}
-            autoFocus
-            aria-invalid={errors.name ? true : undefined}
-            onChange={(event) => setValues((v) => ({ ...v, name: event.target.value }))}
-          />
-          {errors.name && <span className="detail-error">{errors.name}</span>}
-        </label>
-        <label className="detail-field detail-toggle">
-          <input
-            type="checkbox"
-            checked={values.active}
-            onChange={(event) => setValues((v) => ({ ...v, active: event.target.checked }))}
-          />
-          <span>Active</span>
-        </label>
-        <div className="detail-actions">
-          <button type="button" onClick={onClose} disabled={saving}>
+    <Drawer anchor="right" open onClose={onClose}>
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        aria-label={isEdit ? 'Edit customer' : 'New customer'}
+        sx={{
+          width: DRAWER_WIDTH,
+          maxWidth: '100vw',
+          p: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}
+      >
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" component="h2">
+            {isEdit ? 'Edit Customer' : 'New Customer'}
+          </Typography>
+          <IconButton aria-label="Close" onClick={onClose}>
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+        {error && <Alert severity="error">{error}</Alert>}
+        <TextField
+          label="Name"
+          value={values.name}
+          autoFocus
+          required
+          error={Boolean(errors.name)}
+          helperText={errors.name}
+          onChange={(event) => setValues((v) => ({ ...v, name: event.target.value }))}
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={values.active}
+              onChange={(event) => setValues((v) => ({ ...v, active: event.target.checked }))}
+            />
+          }
+          label="Active"
+        />
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+          <Button type="button" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
-          <button type="submit" className="detail-save" disabled={!canSave || saving}>
+          </Button>
+          <Button type="submit" variant="contained" disabled={!canSave || saving}>
             {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </form>
-      {pane.mode === 'edit' && (
-        <div className="detail-danger">
-          <p className="detail-danger-hint">
-            Type <strong>{pane.customer.name}</strong> to permanently delete this customer and
-            everything under it (its projects, their tasks, and those tasks' notes and label
-            links). This cannot be undone.
-          </p>
-          <input
-            type="text"
-            className="detail-delete-confirm"
-            value={deleteName}
-            placeholder="Customer name"
-            aria-label="Type the customer name to confirm deletion"
-            onChange={(event) => setDeleteName(event.target.value)}
-          />
-          {deleteError && <p role="alert">{deleteError}</p>}
-          <button
-            type="button"
-            className="detail-delete"
-            disabled={!confirmed || saving || deleting}
-            onClick={handleDelete}
-          >
-            {deleting ? 'Deleting…' : 'Delete Customer'}
-          </button>
-        </div>
-      )}
-    </aside>
+          </Button>
+        </Stack>
+      </Box>
+    </Drawer>
   )
 }
 
@@ -1645,10 +1685,7 @@ function TaskDetailPane({
   onLabelCreated: (label: Label) => void
   onDeleted: (taskId: string) => void
 }) {
-  const isEdit = pane.mode === 'edit'
-  const [values, setValues] = useState<TaskFormValues>(() =>
-    pane.mode === 'edit' ? taskToForm(pane.task) : newTaskForm(pane.projectId, pane.status),
-  )
+  const [values, setValues] = useState<TaskFormValues>(() => taskToForm(pane.task))
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(() => attachedLabelIds)
   const [labelDraft, setLabelDraft] = useState('')
   const [labelBusy, setLabelBusy] = useState(false)
@@ -1660,13 +1697,29 @@ function TaskDetailPane({
   const errors = validateTaskForm(values)
   const canSave = Object.keys(errors).length === 0
 
-  // Active projects grouped by customer for the create-mode Project selector.
-  const projectGroups = customers
-    .map((customer) => ({
-      customer,
-      projects: projects.filter((p) => p.active && p.customerId === customer.id),
-    }))
-    .filter((group) => group.projects.length > 0)
+  // Selectable projects for the Project reassign dropdown, flattened as
+  // "Customer — Project" and restricted to active projects. The task's current
+  // project is always included (even if inactive) so the Select value has a
+  // matching option.
+  const projectOptions = useMemo(() => {
+    const customerName = (cid: string) =>
+      customers.find((c) => c.id === cid)?.name ?? 'Unknown'
+    const options = projects
+      .filter((p) => p.active)
+      .map((p) => ({ id: p.id, label: `${customerName(p.customerId)} — ${p.name}` }))
+    const currentId = pane.task.projectId
+    if (currentId && !options.some((o) => o.id === currentId)) {
+      const current = projects.find((p) => p.id === currentId)
+      if (current) {
+        options.push({
+          id: current.id,
+          label: `${customerName(current.customerId)} — ${current.name} (Inactive)`,
+        })
+      }
+    }
+    options.sort((a, b) => a.label.localeCompare(b.label))
+    return options
+  }, [projects, customers, pane])
 
   function toggleLabel(id: string) {
     setSelectedLabelIds((ids) =>
@@ -1712,14 +1765,11 @@ function TaskDetailPane({
     setSaving(true)
     setError(null)
     try {
-      const saved =
-        pane.mode === 'edit'
-          ? await updateTask(
-              (id, changedFields) => Csa_tasksService.update(id, changedFields),
-              pane.task,
-              values,
-            )
-          : await createTask((record) => Csa_tasksService.create(record), values)
+      const saved = await updateTask(
+        (id, changedFields) => Csa_tasksService.update(id, changedFields),
+        pane.task,
+        values,
+      )
       const savedIds = await saveTaskLabels(writeTaskLabels, saved.id, selectedLabelIds)
       const savedLabels = allLabels.filter((label) => savedIds.includes(label.id))
       setSaving(false)
@@ -1737,7 +1787,7 @@ function TaskDetailPane({
    * deleting the task itself, so no orphaned children remain.
    */
   async function handleDelete() {
-    if (pane.mode !== 'edit' || saving || deleting) return
+    if (saving || deleting) return
     if (
       !window.confirm(
         `Delete the task “${pane.task.name}”? This also deletes its notes and label links.`,
@@ -1769,64 +1819,76 @@ function TaskDetailPane({
   }
 
   return (
-    <aside className="detail-pane" aria-label={isEdit ? 'Edit task' : 'New task'}>
-      <header className="detail-pane-header">
-        <h2>{isEdit ? 'Edit Task' : 'New Task'}</h2>
-        <button type="button" className="detail-pane-close" aria-label="Close" onClick={onClose}>
-          ✕
-        </button>
-      </header>
-      <form className="detail-form" onSubmit={handleSubmit}>
-        {error && <p role="alert">{error}</p>}
-        <label className="detail-field">
-          <span>Name</span>
-          <input
-            type="text"
+    <Drawer anchor="right" open onClose={onClose}>
+      <Box
+        sx={{
+          width: { xs: '100vw', sm: TASK_DRAWER_WIDTH },
+          maxWidth: '100vw',
+          p: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}
+      >
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" component="h2">
+            Edit Task
+          </Typography>
+          <IconButton aria-label="Close" onClick={onClose}>
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          aria-label="Edit task"
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
+          {error && <Alert severity="error">{error}</Alert>}
+          <TextField
+            label="Name"
             value={values.name}
             autoFocus
-            aria-invalid={errors.name ? true : undefined}
+            required
+            error={Boolean(errors.name)}
+            helperText={errors.name}
             onChange={(event) => setValues((v) => ({ ...v, name: event.target.value }))}
           />
-          {errors.name && <span className="detail-error">{errors.name}</span>}
-        </label>
-        {!isEdit && (
-          <label className="detail-field">
-            <span>Project</span>
-            <select
-              value={values.projectId}
-              aria-invalid={errors.projectId ? true : undefined}
-              onChange={(event) => setValues((v) => ({ ...v, projectId: event.target.value }))}
-            >
-              <option value="">Select a project…</option>
-              {projectGroups.map((group) => (
-                <optgroup key={group.customer.id} label={group.customer.name}>
-                  {group.projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            {errors.projectId && <span className="detail-error">{errors.projectId}</span>}
-          </label>
-        )}
-        <label className="detail-field">
-          <span>Status</span>
-          <select
+          <TextField
+            select
+            label="Project"
+            value={values.projectId}
+            required
+            error={Boolean(errors.projectId)}
+            helperText={errors.projectId ?? 'Move this task to another project.'}
+            onChange={(event) => setValues((v) => ({ ...v, projectId: event.target.value }))}
+          >
+            {projectOptions.length === 0 && (
+              <MenuItem value="" disabled>
+                No active projects
+              </MenuItem>
+            )}
+            {projectOptions.map((option) => (
+              <MenuItem key={option.id} value={option.id}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Status"
             value={values.status}
             onChange={(event) => setValues((v) => ({ ...v, status: Number(event.target.value) }))}
           >
             {STATUS_COLUMNS.map((statusColumn) => (
-              <option key={statusColumn.status} value={statusColumn.status}>
+              <MenuItem key={statusColumn.status} value={statusColumn.status}>
                 {statusColumn.label}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </label>
-        <label className="detail-field">
-          <span>Responsible</span>
-          <select
+          </TextField>
+          <TextField
+            select
+            label="Responsible"
             value={values.responsible ?? ''}
             onChange={(event) =>
               setValues((v) => ({
@@ -1835,103 +1897,103 @@ function TaskDetailPane({
               }))
             }
           >
-            <option value="">Unassigned</option>
+            <MenuItem value="">Unassigned</MenuItem>
             {RESPONSIBLE_CHOICES.map((choice) => (
-              <option key={choice.value} value={choice.value}>
+              <MenuItem key={choice.value} value={choice.value}>
                 {choice.label}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </label>
-        <label className="detail-field">
-          <span>Due date</span>
-          <input
+          </TextField>
+          <TextField
             type="date"
+            label="Due date"
             value={values.duedate}
+            slotProps={{ inputLabel: { shrink: true } }}
             onChange={(event) => setValues((v) => ({ ...v, duedate: event.target.value }))}
           />
-        </label>
-        <label className="detail-field">
-          <span>Description</span>
-          <textarea
-            className="detail-textarea"
-            rows={4}
+          <TextField
+            label="Description"
             value={values.description}
+            multiline
+            minRows={4}
             onChange={(event) => setValues((v) => ({ ...v, description: event.target.value }))}
           />
-        </label>
-        <fieldset className="detail-field detail-labels">
-          <legend>Labels</legend>
-          {allLabels.length === 0 ? (
-            <p className="detail-labels-empty">No labels available.</p>
-          ) : (
-            <div className="detail-labels-list">
-              {allLabels.map((label) => {
-                const checked = selectedLabelIds.includes(label.id)
-                return (
-                  <label
-                    key={label.id}
-                    className={checked ? 'label-chip label-chip-on' : 'label-chip'}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleLabel(label.id)}
+          <Box>
+            <Typography variant="subtitle2" component="span">
+              Labels
+            </Typography>
+            {allLabels.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                No labels available.
+              </Typography>
+            ) : (
+              <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                {allLabels.map((label) => {
+                  const checked = selectedLabelIds.includes(label.id)
+                  return (
+                    <Chip
+                      key={label.id}
+                      label={label.name}
+                      size="small"
+                      color={checked ? 'primary' : 'default'}
+                      variant={checked ? 'filled' : 'outlined'}
+                      onClick={() => toggleLabel(label.id)}
                     />
-                    <span>{label.name}</span>
-                  </label>
-                )
-              })}
-            </div>
-          )}
-          <div className="detail-label-add">
-            <input
-              type="text"
-              className="detail-label-add-input"
-              placeholder="Add or create a label…"
-              value={labelDraft}
-              onChange={(event) => setLabelDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  void handleAddLabel()
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="detail-label-add-button"
-              disabled={labelDraft.trim() === '' || labelBusy}
-              onClick={() => void handleAddLabel()}
-            >
-              {labelBusy ? 'Adding…' : 'Add'}
-            </button>
-          </div>
-          {labelError && <span className="detail-error">{labelError}</span>}
-        </fieldset>
-        <div className="detail-actions">
-          <button type="button" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-          <button type="submit" className="detail-save" disabled={!canSave || saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </form>
-      {isEdit && (
-        <div className="detail-danger">
-          <button
-            type="button"
-            className="detail-delete"
-            disabled={saving || deleting}
-            onClick={handleDelete}
-          >
-            {deleting ? 'Deleting…' : 'Delete Task'}
-          </button>
-        </div>
-      )}
-      {isEdit && <TaskNotes taskId={pane.task.id} />}
-    </aside>
+                  )
+                })}
+              </Stack>
+            )}
+            <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'flex-start' }}>
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Add or create a label…"
+                value={labelDraft}
+                onChange={(event) => setLabelDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    void handleAddLabel()
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                onClick={() => void handleAddLabel()}
+                disabled={labelDraft.trim() === '' || labelBusy}
+              >
+                {labelBusy ? 'Adding…' : 'Add'}
+              </Button>
+            </Stack>
+            {labelError && (
+              <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                {labelError}
+              </Typography>
+            )}
+          </Box>
+          <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+            <Button type="button" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={!canSave || saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </Stack>
+        </Box>
+        <Button
+          type="button"
+          color="error"
+          variant="outlined"
+          disabled={saving || deleting}
+          onClick={handleDelete}
+          sx={{ alignSelf: 'flex-start' }}
+        >
+          {deleting ? 'Deleting…' : 'Delete Task'}
+        </Button>
+        <Divider />
+        <TaskNotes taskId={pane.task.id} />
+      </Box>
+    </Drawer>
   )
 }
 
@@ -2013,50 +2075,62 @@ function TaskNotes({ taskId }: { taskId: string }) {
   }
 
   return (
-    <section className="detail-notes" aria-label="Notes">
-      <h3>Notes</h3>
-      <div className="detail-note-composer">
-        <textarea
-          className="detail-textarea"
-          rows={3}
-          placeholder="Add a note…"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-        />
-        <button
-          type="button"
-          className="detail-add-note"
-          disabled={!canAdd}
-          onClick={handleAdd}
-        >
-          {adding ? 'Adding…' : 'Add Note'}
-        </button>
-      </div>
-      {error && <p role="alert">{error}</p>}
+    <Box component="section" aria-label="Notes" sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <Typography variant="subtitle1" component="h3">
+        Notes
+      </Typography>
+      <TextField
+        multiline
+        minRows={3}
+        placeholder="Add a note…"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <Button
+        type="button"
+        variant="outlined"
+        onClick={handleAdd}
+        disabled={!canAdd}
+        sx={{ alignSelf: 'flex-start' }}
+      >
+        {adding ? 'Adding…' : 'Add Note'}
+      </Button>
+      {error && <Alert severity="error">{error}</Alert>}
       {loading ? (
-        <p className="detail-notes-empty">Loading notes…</p>
+        <Typography variant="body2" color="text.secondary">
+          Loading notes…
+        </Typography>
       ) : notes.length === 0 ? (
-        <p className="detail-notes-empty">No notes yet.</p>
+        <Typography variant="body2" color="text.secondary">
+          No notes yet.
+        </Typography>
       ) : (
-        <ol className="detail-notes-timeline">
+        <Stack component="ol" spacing={1.5} sx={{ listStyle: 'none', m: 0, p: 0 }}>
           {notes.map((note) => (
-            <li key={note.id} className="detail-note">
-              <time className="detail-note-time">{formatNoteTime(note.createdOn)}</time>
-              <p className="detail-note-text">{note.text}</p>
-              <button
-                type="button"
-                className="detail-note-delete"
-                aria-label="Delete note"
-                disabled={deletingId === note.id}
-                onClick={() => void handleDeleteNote(note.id)}
-              >
-                {deletingId === note.id ? 'Deleting…' : 'Delete'}
-              </button>
-            </li>
+            <Box component="li" key={note.id}>
+              <Stack direction="row" sx={{ alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {formatNoteTime(note.createdOn)}
+                </Typography>
+                <Button
+                  type="button"
+                  size="small"
+                  color="error"
+                  aria-label="Delete note"
+                  disabled={deletingId === note.id}
+                  onClick={() => void handleDeleteNote(note.id)}
+                >
+                  {deletingId === note.id ? 'Deleting…' : 'Delete'}
+                </Button>
+              </Stack>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                {note.text}
+              </Typography>
+            </Box>
           ))}
-        </ol>
+        </Stack>
       )}
-    </section>
+    </Box>
   )
 }
 
