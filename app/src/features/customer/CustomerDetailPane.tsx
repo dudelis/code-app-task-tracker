@@ -98,6 +98,26 @@ export function CustomerDetailPane({
           helperText={errors.name}
           onChange={(event) => setValues((v) => ({ ...v, name: event.target.value }))}
         />
+        <TextField
+          label="Description"
+          value={values.description}
+          multiline
+          minRows={3}
+          onChange={(event) => setValues((v) => ({ ...v, description: event.target.value }))}
+        />
+        <TextField
+          label="Industry"
+          value={values.industry}
+          onChange={(event) => setValues((v) => ({ ...v, industry: event.target.value }))}
+        />
+        <TextField
+          label="Portfolio Summary"
+          value={values.portfolioSummary}
+          multiline
+          minRows={3}
+          helperText="Maintained automatically — your edits may be overwritten."
+          onChange={(event) => setValues((v) => ({ ...v, portfolioSummary: event.target.value }))}
+        />
         <FormControlLabel
           control={
             <Switch
