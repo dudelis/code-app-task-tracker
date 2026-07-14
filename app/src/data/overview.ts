@@ -145,3 +145,43 @@ export function buildCustomerGrid(
 
   return { activeProjects, inactiveProjects };
 }
+
+/**
+ * One company's slice of the global My Tasks view: a customer with its Grid
+ * partition (active projects split into open/Completed, plus an Inactive
+ * bucket). Reuses {@link CustomerGrid}'s shape so the global and per-customer
+ * table views share one row/section structure.
+ */
+export interface CompanyGrid extends CustomerGrid {
+  customer: Customer;
+}
+
+/** Order customers alphabetically by name for stable display. */
+function compareCustomers(a: Customer, b: Customer): number {
+  return a.name.localeCompare(b.name);
+}
+
+/**
+ * Build the global My Tasks partition: every customer that owns at least one
+ * project, alphabetical, each with its per-customer Grid partition (active
+ * projects with open/Completed splits and a bottom Inactive bucket). Composes
+ * {@link buildCustomerGrid} per company so the single-customer and company-
+ * grouped shapes stay identical below the company level. Companies with no
+ * projects are omitted so the view lists only companies with work. Pure, so
+ * grouping and ordering can be unit-tested without data access; the caller
+ * pre-applies any Responsible filter, exactly as the Grid does.
+ */
+export function buildGlobalGrid(
+  customers: Customer[],
+  projects: Project[],
+  tasks: Task[],
+): CompanyGrid[] {
+  return [...customers]
+    .sort(compareCustomers)
+    .map((customer) => ({ customer, ...buildCustomerGrid(customer, projects, tasks) }))
+    .filter(
+      (company) =>
+        company.activeProjects.length > 0 || company.inactiveProjects.length > 0,
+    );
+}
+

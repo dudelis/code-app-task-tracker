@@ -34,6 +34,7 @@ import { RowMenu } from './components/RowMenu'
 import { HardDeleteDialog } from './components/HardDeleteDialog'
 import { Board } from './features/board/Board'
 import { Grid } from './features/grid/Grid'
+import { MyTasks } from './features/mytasks/MyTasks'
 import { CustomerDetailPane } from './features/customer/CustomerDetailPane'
 import { ProjectDetailPane } from './features/project/ProjectDetailPane'
 import { TaskDetailPane } from './features/task/TaskDetailPane'
@@ -60,6 +61,9 @@ function App() {
   // Labels management view is the one alternate screen still reachable.
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [showLabels, setShowLabels] = useState(false)
+  // The global My Tasks destination spans every customer and ignores the rail's
+  // customer selection while active.
+  const [showMyTasks, setShowMyTasks] = useState(false)
   // Per-customer workspace tab: the swimlane Board or the table Grid.
   const [customerView, setCustomerView] = useState<'board' | 'grid'>('board')
   const [responsibleFilter, setResponsibleFilter] = useState<ResponsibleFilter>('all')
@@ -213,6 +217,7 @@ function App() {
                   setTaskPane(null)
                   setCustomerPane(null)
                   setProjectPane(null)
+                  setShowMyTasks(false)
                   setShowLabels(true)
                 }}
               >
@@ -244,6 +249,23 @@ function App() {
                   New Customer
                 </Button>
               </Box>
+              <List>
+                <ListItem disablePadding>
+                  <ListItemButton
+                    className="my-tasks"
+                    selected={showMyTasks}
+                    onClick={() => {
+                      setShowLabels(false)
+                      setShowMyTasks(true)
+                      setTaskPane(null)
+                      setCustomerPane(null)
+                      setProjectPane(null)
+                    }}
+                  >
+                    <ListItemText primary="My Tasks" />
+                  </ListItemButton>
+                </ListItem>
+              </List>
               {railCustomers.length === 0 ? (
                 <Typography color="text.secondary" sx={{ p: 2 }}>
                   {showInactive ? 'No customers yet.' : 'No active customers yet.'}
@@ -265,9 +287,10 @@ function App() {
                       }
                     >
                       <ListItemButton
-                        selected={!showLabels && customer.id === effectiveCustomerId}
+                        selected={!showLabels && !showMyTasks && customer.id === effectiveCustomerId}
                         onClick={() => {
                           setShowLabels(false)
+                          setShowMyTasks(false)
                           setSelectedCustomerId(customer.id)
                           setTaskPane(null)
                         }}
@@ -299,6 +322,14 @@ function App() {
                 onBack={() => setShowLabels(false)}
                 onLabelUpserted={applyLabelUpsert}
                 onLabelRemoved={applyLabelRemove}
+              />
+            ) : showMyTasks ? (
+              <MyTasks
+                data={state.data}
+                responsibleFilter={responsibleFilter}
+                onTaskStatusChanged={applyTaskStatus}
+                onSelectTask={(task) => openTaskPane({ mode: 'edit', task })}
+                onTaskCreated={applyTaskUpsert}
               />
             ) : effectiveCustomerId ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>

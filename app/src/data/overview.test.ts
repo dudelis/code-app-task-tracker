@@ -3,7 +3,7 @@ import type { Customer } from './customers';
 import type { Project } from './projects';
 import type { Task } from './tasks';
 import { DONE_STATUS } from './tasks';
-import { buildCustomerGrid, buildOverviewTree } from './overview';
+import { buildCustomerGrid, buildGlobalGrid, buildOverviewTree } from './overview';
 
 function customer(partial: Partial<Customer> & Pick<Customer, 'id'>): Customer {
   return { name: partial.id, active: true, description: '', industry: '', portfolioSummary: '', ...partial };
@@ -259,5 +259,81 @@ describe('buildCustomerGrid', () => {
 
     expect(group.openTasks.map((t) => t.id)).toEqual(['t1']);
     expect(group.completedTasks).toEqual([]);
+  });
+});
+
+describe('buildGlobalGrid', () => {
+  it('groups companies alphabetically by name', () => {
+    const customers = [
+      customer({ id: 'c1', name: 'Zeta' }),
+      customer({ id: 'c2', name: 'Acme' }),
+      customer({ id: 'c3', name: 'Beta' }),
+    ];
+    const projects = [
+      project({ id: 'p1', customerId: 'c1' }),
+      project({ id: 'p2', customerId: 'c2' }),
+      project({ id: 'p3', customerId: 'c3' }),
+    ];
+
+    const companies = buildGlobalGrid(customers, projects, []);
+
+    expect(companies.map((company) => company.customer.name)).toEqual([
+      'Acme',
+      'Beta',
+      'Zeta',
+    ]);
+  });
+
+  it('omits companies that own no projects', () => {
+    const customers = [
+      customer({ id: 'c1', name: 'Acme' }),
+      customer({ id: 'c2', name: 'Beta' }),
+    ];
+    const projects = [project({ id: 'p1', customerId: 'c1' })];
+
+    const companies = buildGlobalGrid(customers, projects, []);
+
+    expect(companies.map((company) => company.customer.id)).toEqual(['c1']);
+  });
+
+  it('gives each company the same per-customer Grid partition below the company level', () => {
+    const customers = [customer({ id: 'c1', name: 'Acme' })];
+    const projects = [
+      project({ id: 'p1', name: 'Active', customerId: 'c1', active: true }),
+      project({ id: 'p2', name: 'Old', customerId: 'c1', active: false }),
+    ];
+    const tasks = [
+      task({ id: 't1', projectId: 'p1', status: 100000000 }),
+      task({ id: 't2', projectId: 'p1', status: DONE_STATUS }),
+      task({ id: 't3', projectId: 'p2', status: 100000000 }),
+    ];
+
+    const [company] = buildGlobalGrid(customers, projects, tasks);
+
+    expect(company).toEqual({
+      customer: customers[0],
+      ...buildCustomerGrid(customers[0], projects, tasks),
+    });
+    expect(company.activeProjects.map((g) => g.project.id)).toEqual(['p1']);
+    expect(company.activeProjects[0].openTasks.map((t) => t.id)).toEqual(['t1']);
+    expect(company.activeProjects[0].completedTasks.map((t) => t.id)).toEqual(['t2']);
+    expect(company.inactiveProjects.map((g) => g.project.id)).toEqual(['p2']);
+  });
+
+  it('spans multiple customers, each with its own projects', () => {
+    const customers = [
+      customer({ id: 'c1', name: 'Acme' }),
+      customer({ id: 'c2', name: 'Beta' }),
+    ];
+    const projects = [
+      project({ id: 'p1', name: 'Site', customerId: 'c1' }),
+      project({ id: 'p2', name: 'App', customerId: 'c2' }),
+    ];
+
+    const companies = buildGlobalGrid(customers, projects, []);
+
+    expect(companies).toHaveLength(2);
+    expect(companies[0].activeProjects.map((g) => g.project.id)).toEqual(['p1']);
+    expect(companies[1].activeProjects.map((g) => g.project.id)).toEqual(['p2']);
   });
 });
