@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Divider from '@mui/material/Divider'
 import Drawer from '@mui/material/Drawer'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import IconButton from '@mui/material/IconButton'
@@ -12,6 +13,7 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import CloseIcon from '@mui/icons-material/Close'
+import { ProjectNotes } from './ProjectNotes'
 import {
   createProject,
   newProjectForm,
@@ -73,9 +75,6 @@ export function ProjectDetailPane({
   return (
     <Drawer anchor="right" open onClose={onClose}>
       <Box
-        component="form"
-        onSubmit={handleSubmit}
-        aria-label={isEdit ? 'Edit project' : 'New project'}
         sx={{
           width: DRAWER_WIDTH,
           maxWidth: '100vw',
@@ -93,6 +92,12 @@ export function ProjectDetailPane({
             <CloseIcon />
           </IconButton>
         </Stack>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          aria-label={isEdit ? 'Edit project' : 'New project'}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
         {error && <Alert severity="error">{error}</Alert>}
         <TextField
           label="Name"
@@ -181,6 +186,13 @@ export function ProjectDetailPane({
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </Stack>
+        </Box>
+        {pane.mode === 'edit' && (
+          <>
+            <Divider />
+            <ProjectNotes projectId={pane.project.id} />
+          </>
+        )}
       </Box>
     </Drawer>
   )

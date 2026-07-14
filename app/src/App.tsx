@@ -395,7 +395,7 @@ function App() {
         <HardDeleteDialog
           entity="Customer"
           name={customerDelete.name}
-          description="its projects, their tasks, and those tasks' notes and label links"
+          description="its projects, their tasks, those tasks' notes and label links, and the projects' notes and contact links"
           onCancel={() => setCustomerDelete(null)}
           onConfirm={async () => {
             await runCustomerCascade(customerDelete.id)
@@ -408,7 +408,7 @@ function App() {
         <HardDeleteDialog
           entity="Project"
           name={projectDelete.name}
-          description="its tasks, their notes and label links"
+          description="its tasks, their notes and label links, its project notes, and its contact links"
           onCancel={() => setProjectDelete(null)}
           onConfirm={async () => {
             await runProjectCascade(projectDelete.id)
