@@ -15,6 +15,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import {
   createProject,
   newProjectForm,
+  PRIORITY_OPTIONS,
   projectToForm,
   updateProject,
   validateProjectForm,
@@ -118,6 +119,51 @@ export function ProjectDetailPane({
             </MenuItem>
           ))}
         </TextField>
+        <TextField
+          label="Description"
+          value={values.description}
+          multiline
+          minRows={3}
+          onChange={(event) => setValues((v) => ({ ...v, description: event.target.value }))}
+        />
+        <TextField
+          select
+          label="Priority"
+          value={values.priority ?? ''}
+          onChange={(event) =>
+            setValues((v) => ({
+              ...v,
+              priority: event.target.value === '' ? null : Number(event.target.value),
+            }))
+          }
+        >
+          <MenuItem value="">None</MenuItem>
+          {PRIORITY_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          type="date"
+          label="Due date"
+          value={values.dueDate}
+          slotProps={{ inputLabel: { shrink: true } }}
+          onChange={(event) => setValues((v) => ({ ...v, dueDate: event.target.value }))}
+        />
+        <TextField
+          label="Materials URL"
+          value={values.materialsUrl}
+          onChange={(event) => setValues((v) => ({ ...v, materialsUrl: event.target.value }))}
+        />
+        <TextField
+          label="Notes Summary"
+          value={values.notesSummary}
+          multiline
+          minRows={3}
+          helperText="Maintained automatically by the status workflow — your edits may be overwritten."
+          onChange={(event) => setValues((v) => ({ ...v, notesSummary: event.target.value }))}
+        />
         <FormControlLabel
           control={
             <Switch
