@@ -63,3 +63,85 @@ export function buildOverviewTree(
       projects: projectNodesByCustomer.get(customer.id) ?? [],
     }));
 }
+
+/**
+ * A project grouped for the table (Grid / My Tasks) views: its open tasks and,
+ * separately, its Done tasks — the latter shown behind a collapsed "Completed"
+ * line. Both lists are ordered by sort order then name.
+ */
+export interface GridProjectGroup {
+  project: Project;
+  openTasks: Task[];
+  completedTasks: Task[];
+}
+
+/**
+ * One customer's tasks partitioned for the Grid table: active projects (each
+ * split into open and Completed tasks) plus a single Inactive bucket holding
+ * inactive projects with their tasks. Projects are alphabetical within each
+ * bucket. Kept separate from active projects so the view can gather inactive
+ * work into one collapsed section at the bottom.
+ */
+export interface CustomerGrid {
+  activeProjects: GridProjectGroup[];
+  inactiveProjects: GridProjectGroup[];
+}
+
+/** Order tasks by sort order, then by name for stability. */
+function compareTasks(a: Task, b: Task): number {
+  if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+  return a.name.localeCompare(b.name);
+}
+
+/** Order projects alphabetically by name for stable display. */
+function compareProjects(a: Project, b: Project): number {
+  return a.name.localeCompare(b.name);
+}
+
+/**
+ * Split one project's tasks into open (not Done) and completed (Done) lists,
+ * each ordered by sort order then name.
+ */
+function groupProjectTasks(project: Project, tasks: Task[]): GridProjectGroup {
+  const openTasks = tasks.filter(isNotDone).sort(compareTasks);
+  const completedTasks = tasks.filter((task) => !isNotDone(task)).sort(compareTasks);
+  return { project, openTasks, completedTasks };
+}
+
+/**
+ * Build one customer's Grid partition: group the customer's projects by their
+ * active flag, ordering each bucket alphabetically, and split every project's
+ * tasks into open and Completed lists. Tasks whose project is not the
+ * customer's (or is missing) are ignored. Pure, so placement and ordering can
+ * be unit-tested without data access; the caller pre-applies any Responsible
+ * filter, exactly as the swimlane board does.
+ */
+export function buildCustomerGrid(
+  customer: Customer,
+  projects: Project[],
+  tasks: Task[],
+): CustomerGrid {
+  const tasksByProject = new Map<string, Task[]>();
+  for (const task of tasks) {
+    const siblings = tasksByProject.get(task.projectId);
+    if (siblings) {
+      siblings.push(task);
+    } else {
+      tasksByProject.set(task.projectId, [task]);
+    }
+  }
+
+  const owned = projects.filter((project) => project.customerId === customer.id);
+
+  const activeProjects = owned
+    .filter((project) => project.active)
+    .sort(compareProjects)
+    .map((project) => groupProjectTasks(project, tasksByProject.get(project.id) ?? []));
+
+  const inactiveProjects = owned
+    .filter((project) => !project.active)
+    .sort(compareProjects)
+    .map((project) => groupProjectTasks(project, tasksByProject.get(project.id) ?? []));
+
+  return { activeProjects, inactiveProjects };
+}

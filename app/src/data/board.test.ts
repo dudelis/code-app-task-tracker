@@ -9,6 +9,7 @@ import {
   buildCustomerBoard,
   buildProjectBoard,
   completeChange,
+  reopenChange,
   statusChange,
   statusOnDrop,
 } from './board';
@@ -112,6 +113,29 @@ describe('completeChange', () => {
   it('delegates to the shared statusChange rule', () => {
     const t = task({ id: 't', projectId: 'p', status: 100000001 });
     expect(completeChange(t)).toEqual(statusChange(t, DONE_STATUS));
+  });
+});
+
+describe('reopenChange', () => {
+  it('reopens a Done task by setting it to Backlog', () => {
+    expect(reopenChange(task({ id: 't', projectId: 'p', status: DONE_STATUS }))).toEqual({
+      changed: true,
+      status: BACKLOG_STATUS,
+    });
+  });
+
+  it('is a no-op for a task that is not Done, leaving its status untouched', () => {
+    expect(reopenChange(task({ id: 't', projectId: 'p', status: 100000002 }))).toEqual({
+      changed: false,
+      status: 100000002,
+    });
+  });
+
+  it('treats an unset status as not Done and is a no-op', () => {
+    expect(reopenChange(task({ id: 't', projectId: 'p', status: undefined }))).toEqual({
+      changed: false,
+      status: BACKLOG_STATUS,
+    });
   });
 });
 

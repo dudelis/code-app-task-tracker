@@ -3,7 +3,7 @@ import type { Customer } from './customers';
 import type { Project } from './projects';
 import type { Task } from './tasks';
 import { DONE_STATUS } from './tasks';
-import { buildOverviewTree } from './overview';
+import { buildCustomerGrid, buildOverviewTree } from './overview';
 
 function customer(partial: Partial<Customer> & Pick<Customer, 'id'>): Customer {
   return { name: partial.id, active: true, ...partial };
@@ -158,5 +158,101 @@ describe('buildOverviewTree', () => {
       { project: projects[0], tasks: [] },
       { project: projects[1], tasks: [] },
     ]);
+  });
+});
+
+describe('buildCustomerGrid', () => {
+  it('groups active projects alphabetically by name', () => {
+    const c = customer({ id: 'c1' });
+    const projects = [
+      project({ id: 'p1', name: 'Website', customerId: 'c1' }),
+      project({ id: 'p2', name: 'Api', customerId: 'c1' }),
+      project({ id: 'p3', name: 'Migration', customerId: 'c1' }),
+    ];
+
+    const grid = buildCustomerGrid(c, projects, []);
+
+    expect(grid.activeProjects.map((g) => g.project.name)).toEqual([
+      'Api',
+      'Migration',
+      'Website',
+    ]);
+    expect(grid.inactiveProjects).toEqual([]);
+  });
+
+  it('ignores projects owned by another customer', () => {
+    const c = customer({ id: 'c1' });
+    const projects = [
+      project({ id: 'p1', customerId: 'c1' }),
+      project({ id: 'p2', customerId: 'c2' }),
+    ];
+
+    const grid = buildCustomerGrid(c, projects, []);
+
+    expect(grid.activeProjects.map((g) => g.project.id)).toEqual(['p1']);
+  });
+
+  it('splits each active project into open tasks and a Completed (Done) list', () => {
+    const c = customer({ id: 'c1' });
+    const projects = [project({ id: 'p1', customerId: 'c1' })];
+    const tasks = [
+      task({ id: 't1', projectId: 'p1', status: 100000000 }),
+      task({ id: 't2', projectId: 'p1', status: DONE_STATUS }),
+      task({ id: 't3', projectId: 'p1', status: 100000002 }),
+    ];
+
+    const [group] = buildCustomerGrid(c, projects, tasks).activeProjects;
+
+    expect(group.openTasks.map((t) => t.id)).toEqual(['t1', 't3']);
+    expect(group.completedTasks.map((t) => t.id)).toEqual(['t2']);
+  });
+
+  it('orders open and completed tasks by sort order then name', () => {
+    const c = customer({ id: 'c1' });
+    const projects = [project({ id: 'p1', customerId: 'c1' })];
+    const tasks = [
+      task({ id: 't1', projectId: 'p1', name: 'Zed', status: 100000000, sortOrder: 2 }),
+      task({ id: 't2', projectId: 'p1', name: 'Beta', status: 100000000, sortOrder: 1 }),
+      task({ id: 't3', projectId: 'p1', name: 'Alpha', status: 100000000, sortOrder: 1 }),
+      task({ id: 'd1', projectId: 'p1', name: 'Yak', status: DONE_STATUS, sortOrder: 5 }),
+      task({ id: 'd2', projectId: 'p1', name: 'Ant', status: DONE_STATUS, sortOrder: 4 }),
+    ];
+
+    const [group] = buildCustomerGrid(c, projects, tasks).activeProjects;
+
+    expect(group.openTasks.map((t) => t.id)).toEqual(['t3', 't2', 't1']);
+    expect(group.completedTasks.map((t) => t.id)).toEqual(['d2', 'd1']);
+  });
+
+  it('routes inactive projects (with their tasks) into the Inactive bucket, alphabetically', () => {
+    const c = customer({ id: 'c1' });
+    const projects = [
+      project({ id: 'p1', name: 'Active', customerId: 'c1', active: true }),
+      project({ id: 'p2', name: 'Zeta', customerId: 'c1', active: false }),
+      project({ id: 'p3', name: 'Alpha', customerId: 'c1', active: false }),
+    ];
+    const tasks = [
+      task({ id: 't1', projectId: 'p2', status: 100000000 }),
+      task({ id: 't2', projectId: 'p2', status: DONE_STATUS }),
+    ];
+
+    const grid = buildCustomerGrid(c, projects, tasks);
+
+    expect(grid.activeProjects.map((g) => g.project.id)).toEqual(['p1']);
+    expect(grid.inactiveProjects.map((g) => g.project.name)).toEqual(['Alpha', 'Zeta']);
+    const zeta = grid.inactiveProjects.find((g) => g.project.id === 'p2')!;
+    expect(zeta.openTasks.map((t) => t.id)).toEqual(['t1']);
+    expect(zeta.completedTasks.map((t) => t.id)).toEqual(['t2']);
+  });
+
+  it('treats a task with unset status as open (Backlog)', () => {
+    const c = customer({ id: 'c1' });
+    const projects = [project({ id: 'p1', customerId: 'c1' })];
+    const tasks = [task({ id: 't1', projectId: 'p1', status: undefined })];
+
+    const [group] = buildCustomerGrid(c, projects, tasks).activeProjects;
+
+    expect(group.openTasks.map((t) => t.id)).toEqual(['t1']);
+    expect(group.completedTasks).toEqual([]);
   });
 });

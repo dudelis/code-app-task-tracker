@@ -62,6 +62,21 @@ export function completeChange(task: Task): StatusTransition {
   return statusChange(task, DONE_STATUS);
 }
 
+/**
+ * Pure reopen rule: reopening a Done task returns it to Backlog. Reports
+ * `changed: false` for any task that is not Done (an unset status counts as
+ * Backlog, so it is not Done), leaving its status untouched — reopen only ever
+ * acts on a completed task. The mirror of {@link completeChange}, so the
+ * completion circle can toggle a card between Done and Backlog.
+ */
+export function reopenChange(task: Task): StatusTransition {
+  const current = task.status ?? BACKLOG_STATUS;
+  if (current !== DONE_STATUS) {
+    return { changed: false, status: current };
+  }
+  return { changed: true, status: BACKLOG_STATUS };
+}
+
 /** Tasks for one project in one status column, sorted for display. */
 export interface BoardCell extends StatusColumn {
   tasks: Task[];

@@ -92,7 +92,8 @@ body {
 .board-cell {
   min-height: 3rem;
   padding: 0.35rem;
-  border: 1px dashed #ccc;
+  background: #17171a;
+  border: 1px solid #2a2a2f;
   border-radius: 6px;
   display: flex;
   flex-direction: column;

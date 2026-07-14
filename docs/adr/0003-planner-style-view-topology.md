@@ -1,0 +1,7 @@
+# Planner-style view topology: global My Tasks alongside per-customer Board and Grid
+
+The app has three view destinations with deliberately asymmetric scope, mirroring Microsoft Planner. **My Tasks** is a global view spanning every Customer and ignores the left-rail Customer selection. **Board** and **Grid** are per-customer tabs that appear only once a Customer is selected in the rail; both are scoped to that one Customer. The Customer rail is retained as the way to open a Customer's Board/Grid, while My Tasks sits above it as its own rail entry.
+
+**Why:** the user works in Planner daily and asked for the same model, where "My tasks" is a personal cross-plan list while each plan (here, Customer) has its own Grid/Board tabs. A uniform scoping (making all three per-customer, or all three global) was rejected: a per-customer "My Tasks" would not satisfy the need to see all work across Customers in one place, and a global Board/Grid would lose the single-customer focus the swimlane board is built around. The asymmetry is the feature, not an accident.
+
+**Consequence:** navigation and data loading must treat My Tasks and the per-customer tabs differently — My Tasks reads across all Customers regardless of rail selection, whereas Board and Grid derive their scope from it. A future reader seeing "why is one view global and two per-customer?" should read this as intentional Planner parity. Reversing it later (e.g. unifying scope) would ripple through routing, the rail, and every view's data query, which is why it is recorded here.
