@@ -13,6 +13,7 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import CloseIcon from '@mui/icons-material/Close'
+import { ProjectContacts } from './ProjectContacts'
 import { ProjectNotes } from './ProjectNotes'
 import {
   createProject,
@@ -189,6 +190,8 @@ export function ProjectDetailPane({
         </Box>
         {pane.mode === 'edit' && (
           <>
+            <Divider />
+            <ProjectContacts projectId={pane.project.id} customerId={pane.project.customerId} />
             <Divider />
             <ProjectNotes projectId={pane.project.id} />
           </>
