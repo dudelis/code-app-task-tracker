@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Divider from '@mui/material/Divider'
 import Drawer from '@mui/material/Drawer'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import IconButton from '@mui/material/IconButton'
@@ -22,6 +23,7 @@ import {
 } from '../../data/customers'
 import type { CustomerPane } from '../../types'
 import { DRAWER_WIDTH } from '../../shared/layout'
+import { CustomerContacts } from './CustomerContacts'
 import { Csa_customersService } from '../../generated/services/Csa_customersService'
 
 /** The right-anchored Create/Edit Customer form drawer. */
@@ -68,9 +70,6 @@ export function CustomerDetailPane({
   return (
     <Drawer anchor="right" open onClose={onClose}>
       <Box
-        component="form"
-        onSubmit={handleSubmit}
-        aria-label={isEdit ? 'Edit customer' : 'New customer'}
         sx={{
           width: DRAWER_WIDTH,
           maxWidth: '100vw',
@@ -88,6 +87,12 @@ export function CustomerDetailPane({
             <CloseIcon />
           </IconButton>
         </Stack>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          aria-label={isEdit ? 'Edit customer' : 'New customer'}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
         {error && <Alert severity="error">{error}</Alert>}
         <TextField
           label="Name"
@@ -135,6 +140,13 @@ export function CustomerDetailPane({
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </Stack>
+        </Box>
+        {pane.mode === 'edit' && (
+          <>
+            <Divider />
+            <CustomerContacts customerId={pane.customer.id} />
+          </>
+        )}
       </Box>
     </Drawer>
   )
