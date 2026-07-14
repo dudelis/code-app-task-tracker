@@ -41,5 +41,13 @@ Whose court a Task is currently in: either Me (I need to act) or Customer (it's 
 _Avoid_: Assignee, owner, assigned to
 
 **Note**:
-A single dated entry recorded against a Task. Notes accumulate as separate timestamped records but are shown together as one chronological timeline on the task (like the Dynamics timeline), so the full history of a task is visible in one place.
+A single dated entry recorded against a Task **or** a Project. Notes accumulate as separate timestamped records but are shown together as one chronological timeline on their parent (like the Dynamics timeline), so the full history is visible in one place. A Note attaches to exactly one parent — a Task or a Project, never both. Project Notes capture informational context (an FYI, a decision, a customer update) that isn't itself a unit of work; actionable items are Tasks, not Notes.
 _Avoid_: Comment, annotation, log entry
+
+**Contact**:
+A person at a Customer — name, role, email, phone. Every Contact belongs to exactly one Customer and can be linked to any number of that Customer's Projects. Contacts are the people you deal with, and their email addresses are how incoming mail gets matched back to the right Customer.
+_Avoid_: Person, lead, stakeholder, attendee
+
+**Notes Summary**:
+A rolling, regenerated digest — not a hand-written Note. A Project's Notes Summary condenses that Project's Notes into a current-state paragraph; a Customer's Notes Summary is a summary-over-summaries across that Customer's Active Projects. Both are derived views kept fresh by the status workflow, distinct from the append-only Note timeline they summarize.
+_Avoid_: Digest, recap, overview (as concept names)
