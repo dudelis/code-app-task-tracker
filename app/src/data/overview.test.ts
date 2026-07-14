@@ -6,13 +6,13 @@ import { DONE_STATUS } from './tasks';
 import { buildCustomerGrid, buildOverviewTree } from './overview';
 
 function customer(partial: Partial<Customer> & Pick<Customer, 'id'>): Customer {
-  return { name: partial.id, active: true, ...partial };
+  return { name: partial.id, active: true, description: '', industry: '', portfolioSummary: '', ...partial };
 }
 
 function project(
   partial: Partial<Project> & Pick<Project, 'id' | 'customerId'>,
 ): Project {
-  return { name: partial.id, active: true, ...partial };
+  return { name: partial.id, active: true, description: '', materialsUrl: '', dueDate: '', notesSummary: '', ...partial };
 }
 
 function task(partial: Partial<Task> & Pick<Task, 'id' | 'projectId'>): Task {
@@ -119,7 +119,12 @@ describe('buildOverviewTree', () => {
 
   it('gives an active customer with no projects an empty project list', () => {
     const tree = buildOverviewTree([customer({ id: 'c1' })], [], []);
-    expect(tree).toEqual([{ customer: { id: 'c1', name: 'c1', active: true }, projects: [] }]);
+    expect(tree).toEqual([
+      {
+        customer: { id: 'c1', name: 'c1', active: true, description: '', industry: '', portfolioSummary: '' },
+        projects: [],
+      },
+    ]);
   });
 
   it('drops projects whose customer is absent or inactive', () => {

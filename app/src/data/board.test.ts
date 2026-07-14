@@ -15,13 +15,13 @@ import {
 } from './board';
 
 function customer(partial: Partial<Customer> & Pick<Customer, 'id'>): Customer {
-  return { name: partial.id, active: true, ...partial };
+  return { name: partial.id, active: true, description: '', industry: '', portfolioSummary: '', ...partial };
 }
 
 function project(
   partial: Partial<Project> & Pick<Project, 'id' | 'customerId'>,
 ): Project {
-  return { name: partial.id, active: true, ...partial };
+  return { name: partial.id, active: true, description: '', materialsUrl: '', dueDate: '', notesSummary: '', ...partial };
 }
 
 function task(partial: Partial<Task> & Pick<Task, 'id' | 'projectId'>): Task {

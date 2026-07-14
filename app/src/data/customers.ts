@@ -12,6 +12,10 @@ export interface Customer {
   id: string;
   name: string;
   active: boolean;
+  description: string;
+  industry: string;
+  /** Workflow-maintained rollup summary of the customer's portfolio (`csa_portfoliosummary`); '' when unset. */
+  portfolioSummary: string;
 }
 
 /** OData filter that returns only active customers (custom csa_active field, not statecode). */
@@ -31,6 +35,9 @@ export function mapCustomer(record: Csa_customers): Customer {
     id: record.csa_customerid,
     name: record.csa_name ?? '',
     active: record.csa_active === true,
+    description: record.csa_description ?? '',
+    industry: record.csa_industry ?? '',
+    portfolioSummary: record.csa_portfoliosummary ?? '',
   };
 }
 
@@ -93,6 +100,10 @@ export async function updateCustomerActive(
 export interface CustomerFormValues {
   name: string;
   active: boolean;
+  description: string;
+  industry: string;
+  /** Workflow-maintained portfolio summary carried through the form; '' when unset. */
+  portfolioSummary: string;
 }
 
 /** Field-level validation errors for the Customer form, keyed by field. */
@@ -102,12 +113,18 @@ export interface CustomerFormErrors {
 
 /** Blank form values for creating a customer; Active defaults to Yes. */
 export function newCustomerForm(): CustomerFormValues {
-  return { name: '', active: true };
+  return { name: '', active: true, description: '', industry: '', portfolioSummary: '' };
 }
 
 /** Project an existing customer into editable form values. */
 export function customerToForm(customer: Customer): CustomerFormValues {
-  return { name: customer.name, active: customer.active };
+  return {
+    name: customer.name,
+    active: customer.active,
+    description: customer.description,
+    industry: customer.industry,
+    portfolioSummary: customer.portfolioSummary,
+  };
 }
 
 /** Pure validation for the Customer form. Name is required (non-blank). */
@@ -139,11 +156,17 @@ export async function createCustomer(
   const result = await create({
     csa_name: name,
     csa_active: values.active,
+    csa_description: values.description,
+    csa_industry: values.industry,
+    csa_portfoliosummary: values.portfolioSummary,
   } as Omit<Csa_customersBase, 'csa_customerid'>);
   return {
     id: result.data?.csa_customerid ?? '',
     name,
     active: values.active,
+    description: values.description,
+    industry: values.industry,
+    portfolioSummary: values.portfolioSummary,
   };
 }
 
@@ -157,8 +180,14 @@ export async function updateCustomer(
   values: CustomerFormValues,
 ): Promise<Customer> {
   const name = values.name.trim();
-  await update(id, { csa_name: name, csa_active: values.active });
-  return { id, name, active: values.active };
+  await update(id, {
+    csa_name: name,
+    csa_active: values.active,
+    csa_description: values.description,
+    csa_industry: values.industry,
+    csa_portfoliosummary: values.portfolioSummary,
+  });
+  return { id, name, active: values.active, description: values.description, industry: values.industry, portfolioSummary: values.portfolioSummary };
 }
 
 /**

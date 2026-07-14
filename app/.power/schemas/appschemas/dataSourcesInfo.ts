@@ -5,6 +5,13 @@
  */
 
 export const dataSourcesInfo = {
+  "csa_contacts": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "csa_contactid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "csa_customers": {
     "tableId": "",
     "version": "",
@@ -23,6 +30,13 @@ export const dataSourcesInfo = {
     "tableId": "",
     "version": "",
     "primaryKey": "csa_noteid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "csa_projectnotes": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "csa_projectnoteid",
     "dataSourceType": "Dataverse",
     "apis": {}
   },

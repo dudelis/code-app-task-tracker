@@ -113,6 +113,22 @@
           "required": true,
           "x-ms-keyType": "primary"
         },
+        "csa_description": {
+          "type": "string",
+          "title": "Description",
+          "x-ms-dataverse-attribute": "csa_description",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "csa_Description",
+          "maxLength": 4000
+        },
+        "csa_industry": {
+          "type": "string",
+          "title": "Industry",
+          "x-ms-dataverse-attribute": "csa_industry",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "csa_Industry",
+          "maxLength": 200
+        },
         "csa_name": {
           "type": "string",
           "title": "Name",
@@ -121,6 +137,14 @@
           "x-ms-schema-name": "csa_Name",
           "x-ms-dataverse-primary-name": true,
           "maxLength": 850
+        },
+        "csa_portfoliosummary": {
+          "type": "string",
+          "title": "Portfolio Summary",
+          "x-ms-dataverse-attribute": "csa_portfoliosummary",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "csa_PortfolioSummary",
+          "maxLength": 4000
         },
         "importsequencenumber": {
           "type": "string",

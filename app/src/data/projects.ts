@@ -1,5 +1,6 @@
 import type { Csa_projects } from '../generated/models/Csa_projectsModel';
 import type { Csa_projectsBase } from '../generated/models/Csa_projectsModel';
+import { Csa_projectscsa_priority } from '../generated/models/Csa_projectsModel';
 import type { IGetAllOptions } from '../generated/models/CommonModels';
 import type { IOperationResult } from '@microsoft/power-apps/data';
 import type { TasksFetcher } from './tasks';
@@ -14,6 +15,16 @@ export interface Project {
   active: boolean;
   /** Id of the owning Customer (the `csa_customerid` lookup value). */
   customerId: string;
+  /** Free-text description (`csa_description`); '' when unset. */
+  description: string;
+  /** URL to the project's materials (`csa_materialsurl`); '' when unset. */
+  materialsUrl: string;
+  /** Due date as the raw Dataverse date string (`csa_duedate`); '' when unset. */
+  dueDate: string;
+  /** Raw Dataverse priority choice value (`csa_priority`), or undefined when unset. */
+  priority?: Csa_projectscsa_priority;
+  /** Workflow-maintained rollup summary of the project's notes (`csa_notessummary`); '' when unset. */
+  notesSummary: string;
 }
 
 /** OData filter that returns only active projects (custom csa_active field, not statecode). */
@@ -27,6 +38,12 @@ export type ProjectsFetcher = (
   options?: IGetAllOptions,
 ) => Promise<IOperationResult<Csa_projects[]>>;
 
+/** Resolve a priority choice value to its display label, or '' when unset/unknown. */
+export function priorityLabel(value?: Csa_projectscsa_priority | undefined): string {
+  if (value === undefined) return '';
+  return Csa_projectscsa_priority[value] ?? '';
+}
+
 /** Map a raw Dataverse record to the UI-facing Project shape. */
 export function mapProject(record: Csa_projects): Project {
   return {
@@ -34,6 +51,11 @@ export function mapProject(record: Csa_projects): Project {
     name: record.csa_name ?? '',
     active: record.csa_active === true,
     customerId: record._csa_customerid_value ?? '',
+    description: record.csa_description ?? '',
+    materialsUrl: record.csa_materialsurl ?? '',
+    dueDate: record.csa_duedate ?? '',
+    priority: record.csa_priority,
+    notesSummary: record.csa_notessummary ?? '',
   };
 }
 
@@ -103,6 +125,16 @@ export interface ProjectFormValues {
   /** Id of the owning Customer (required); empty until one is chosen. */
   customerId: string;
   active: boolean;
+  /** Free-text description; '' when unset. */
+  description: string;
+  /** URL to the project's materials; '' when unset. */
+  materialsUrl: string;
+  /** Due date as a date string; '' when unset. */
+  dueDate: string;
+  /** Selected priority choice value, or null when unset. */
+  priority: number | null;
+  /** Workflow-maintained notes summary carried through the form; '' when unset. */
+  notesSummary: string;
 }
 
 /** Field-level validation errors for the Project form, keyed by field. */
@@ -111,17 +143,41 @@ export interface ProjectFormErrors {
   customerId?: string;
 }
 
+/** Selectable priority choices for the form, in Dataverse order. */
+export const PRIORITY_OPTIONS: { value: number; label: string }[] = (
+  Object.keys(Csa_projectscsa_priority) as unknown as Csa_projectscsa_priority[]
+).map((value) => ({ value: Number(value), label: Csa_projectscsa_priority[value] }));
+
 /**
  * Blank form values for creating a project; Active defaults to Yes. An optional
  * customer id pre-fills the required Customer selector (contextual "+ Project").
+ * The new context fields start empty and Priority starts unset.
  */
 export function newProjectForm(customerId = ''): ProjectFormValues {
-  return { name: '', customerId, active: true };
+  return {
+    name: '',
+    customerId,
+    active: true,
+    description: '',
+    materialsUrl: '',
+    dueDate: '',
+    priority: null,
+    notesSummary: '',
+  };
 }
 
 /** Project an existing project into editable form values. */
 export function projectToForm(project: Project): ProjectFormValues {
-  return { name: project.name, customerId: project.customerId, active: project.active };
+  return {
+    name: project.name,
+    customerId: project.customerId,
+    active: project.active,
+    description: project.description ?? '',
+    materialsUrl: project.materialsUrl ?? '',
+    dueDate: project.dueDate ?? '',
+    priority: project.priority ?? null,
+    notesSummary: project.notesSummary ?? '',
+  };
 }
 
 /** Pure validation for the Project form. Name and Customer are both required. */
@@ -154,9 +210,15 @@ export async function createProject(
   values: ProjectFormValues,
 ): Promise<Project> {
   const name = values.name.trim();
+  const priority = (values.priority ?? undefined) as Csa_projectscsa_priority | undefined;
   const result = await create({
     csa_name: name,
     csa_active: values.active,
+    csa_description: values.description,
+    csa_materialsurl: values.materialsUrl,
+    csa_notessummary: values.notesSummary,
+    ...(values.dueDate ? { csa_duedate: values.dueDate } : {}),
+    ...(priority !== undefined ? { csa_priority: priority } : {}),
     'csa_CustomerId@odata.bind': customerBind(values.customerId),
   } as Omit<Csa_projectsBase, 'csa_projectid'>);
   return {
@@ -164,6 +226,11 @@ export async function createProject(
     name,
     active: values.active,
     customerId: values.customerId,
+    description: values.description,
+    materialsUrl: values.materialsUrl,
+    dueDate: values.dueDate,
+    priority,
+    notesSummary: values.notesSummary,
   };
 }
 
@@ -177,12 +244,28 @@ export async function updateProject(
   values: ProjectFormValues,
 ): Promise<Project> {
   const name = values.name.trim();
+  const priority = (values.priority ?? undefined) as Csa_projectscsa_priority | undefined;
   await update(id, {
     csa_name: name,
     csa_active: values.active,
+    csa_description: values.description,
+    csa_materialsurl: values.materialsUrl,
+    csa_notessummary: values.notesSummary,
+    csa_duedate: values.dueDate ? values.dueDate : null,
+    csa_priority: priority ?? null,
     'csa_CustomerId@odata.bind': customerBind(values.customerId),
-  });
-  return { id, name, active: values.active, customerId: values.customerId };
+  } as Partial<Omit<Csa_projectsBase, 'csa_projectid'>>);
+  return {
+    id,
+    name,
+    active: values.active,
+    customerId: values.customerId,
+    description: values.description,
+    materialsUrl: values.materialsUrl,
+    dueDate: values.dueDate,
+    priority,
+    notesSummary: values.notesSummary,
+  };
 }
 
 /**
@@ -225,15 +308,20 @@ export interface ProjectCascadeDeps {
   listTaskIds: (projectId: string) => Promise<string[]>;
   /** Hard-delete a single task and its subtree (composes `deleteTaskCascade`). */
   deleteTaskCascade: (taskId: string) => Promise<void>;
+  /** Delete every note attached directly to the project (not its tasks' notes). */
+  deleteProjectNotes: (projectId: string) => Promise<void>;
+  /** Detach every contact link from the project (the project side of the M:N). */
+  detachContacts: (projectId: string) => Promise<void>;
   /** Delete the project record itself. */
   deleteProject: (projectId: string) => Promise<void>;
 }
 
 /**
  * Hard-delete a project and its subtree (ADR-0002): enumerate the project's
- * tasks, cascade-delete each (its notes and label links go with it), then delete
- * the project. Children are always removed before the parent, so no orphaned
- * descendants remain.
+ * tasks, cascade-delete each (its notes and label links go with it), delete the
+ * notes attached directly to the project, detach the project's contact links,
+ * then delete the project. Children (and M:N links) are always removed before
+ * the parent, so no orphaned descendants or dangling associations remain.
  */
 export async function deleteProjectCascade(
   deps: ProjectCascadeDeps,
@@ -243,5 +331,7 @@ export async function deleteProjectCascade(
   for (const taskId of taskIds) {
     await deps.deleteTaskCascade(taskId);
   }
+  await deps.deleteProjectNotes(projectId);
+  await deps.detachContacts(projectId);
   await deps.deleteProject(projectId);
 }

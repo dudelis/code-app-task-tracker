@@ -38,6 +38,16 @@
           "entitySetName": "csa_notes",
           "logicalName": "csa_note",
           "isHidden": false
+        },
+        "csa_contacts": {
+          "entitySetName": "csa_contacts",
+          "logicalName": "csa_contact",
+          "isHidden": false
+        },
+        "csa_projectnotes": {
+          "entitySetName": "csa_projectnotes",
+          "logicalName": "csa_projectnote",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

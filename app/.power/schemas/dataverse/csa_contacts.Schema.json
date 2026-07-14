@@ -1,13 +1,13 @@
 {
-  "name": "csa_project",
-  "title": "csa_Projects",
+  "name": "csa_contact",
+  "title": "csa_Contacts",
   "schema": {
     "type": "array",
     "items": {
       "type": "object",
       "x-ms-dataverse-entity": true,
-      "x-ms-dataverse-entityset": "csa_projects",
-      "x-ms-dataverse-primary-id": "csa_projectid",
+      "x-ms-dataverse-entityset": "csa_contacts",
+      "x-ms-dataverse-primary-id": "csa_contactid",
       "x-ms-dataverse-primary-name": "csa_name",
       "properties": {
         "createdby": {
@@ -72,36 +72,15 @@
           "required": true,
           "maxLength": 100
         },
-        "csa_active": {
+        "csa_contactid": {
           "type": "string",
-          "title": "Active",
-          "x-ms-dataverse-attribute": "csa_active",
-          "x-ms-dataverse-type": "BooleanType",
-          "x-ms-schema-name": "csa_Active",
-          "enum": [
-            "False",
-            "True"
-          ],
-          "x-ms-enum-values": [
-            0,
-            1
-          ],
-          "Color": [
-            null,
-            null
-          ],
-          "x-ms-optionsetmetadataid": "96929921-0c7d-f111-ab0f-70a8a52b6964",
-          "x-ms-isGlobal": false,
-          "x-ms-optionsetdisplayname": "Active",
-          "x-ms-optionSetType": "Boolean"
-        },
-        "csa_activename": {
-          "type": "string",
-          "title": "csa_activename",
-          "x-ms-dataverse-attribute": "csa_activename",
-          "x-ms-dataverse-type": "VirtualType",
-          "x-ms-schema-name": "csa_activeName",
-          "x-ms-read-only": true
+          "title": "csa_Contact",
+          "x-ms-dataverse-attribute": "csa_contactid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "csa_ContactId",
+          "x-ms-dataverse-primary-id": true,
+          "required": true,
+          "x-ms-keyType": "primary"
         },
         "csa_customerid": {
           "type": "string",
@@ -120,28 +99,13 @@
           "x-ms-read-only": true,
           "maxLength": 850
         },
-        "csa_description": {
+        "csa_email": {
           "type": "string",
-          "title": "Description",
-          "x-ms-dataverse-attribute": "csa_description",
-          "x-ms-dataverse-type": "MemoType",
-          "x-ms-schema-name": "csa_Description",
-          "maxLength": 4000
-        },
-        "csa_duedate": {
-          "type": "string",
-          "title": "DueDate",
-          "x-ms-dataverse-attribute": "csa_duedate",
-          "x-ms-dataverse-type": "DateTimeType",
-          "x-ms-schema-name": "csa_DueDate"
-        },
-        "csa_materialsurl": {
-          "type": "string",
-          "title": "Materials URL",
-          "x-ms-dataverse-attribute": "csa_materialsurl",
+          "title": "Email",
+          "x-ms-dataverse-attribute": "csa_email",
           "x-ms-dataverse-type": "StringType",
-          "x-ms-schema-name": "csa_MaterialsUrl",
-          "maxLength": 500
+          "x-ms-schema-name": "csa_Email",
+          "maxLength": 200
         },
         "csa_name": {
           "type": "string",
@@ -152,57 +116,21 @@
           "x-ms-dataverse-primary-name": true,
           "maxLength": 850
         },
-        "csa_notessummary": {
+        "csa_phone": {
           "type": "string",
-          "title": "Notes Summary",
-          "x-ms-dataverse-attribute": "csa_notessummary",
-          "x-ms-dataverse-type": "MemoType",
-          "x-ms-schema-name": "csa_NotesSummary",
-          "maxLength": 4000
+          "title": "Phone",
+          "x-ms-dataverse-attribute": "csa_phone",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "csa_Phone",
+          "maxLength": 50
         },
-        "csa_priority": {
+        "csa_role": {
           "type": "string",
-          "title": "Priority",
-          "x-ms-dataverse-attribute": "csa_priority",
-          "x-ms-dataverse-type": "PicklistType",
-          "x-ms-schema-name": "csa_Priority",
-          "enum": [
-            "High",
-            "Normal",
-            "Low"
-          ],
-          "x-ms-enum-values": [
-            100000000,
-            100000001,
-            100000002
-          ],
-          "Color": [
-            null,
-            null,
-            null
-          ],
-          "x-ms-optionsetmetadataid": "d77fb43f-7c7f-f111-ab0f-70a8a52b6964",
-          "x-ms-isGlobal": false,
-          "x-ms-optionsetdisplayname": "Priority",
-          "x-ms-optionSetType": "Picklist"
-        },
-        "csa_priorityname": {
-          "type": "string",
-          "title": "csa_priorityname",
-          "x-ms-dataverse-attribute": "csa_priorityname",
-          "x-ms-dataverse-type": "VirtualType",
-          "x-ms-schema-name": "csa_priorityName",
-          "x-ms-read-only": true
-        },
-        "csa_projectid": {
-          "type": "string",
-          "title": "csa_Project",
-          "x-ms-dataverse-attribute": "csa_projectid",
-          "x-ms-dataverse-type": "UniqueidentifierType",
-          "x-ms-schema-name": "csa_ProjectId",
-          "x-ms-dataverse-primary-id": true,
-          "required": true,
-          "x-ms-keyType": "primary"
+          "title": "Role",
+          "x-ms-dataverse-attribute": "csa_role",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "csa_Role",
+          "maxLength": 200
         },
         "importsequencenumber": {
           "type": "string",
@@ -369,7 +297,7 @@
             null,
             null
           ],
-          "x-ms-optionsetmetadataid": "4354222d-0f63-4bf5-96db-badf99177acd",
+          "x-ms-optionsetmetadataid": "c56e0fa7-e0df-4b0a-a599-6f3e5da419d4",
           "x-ms-isGlobal": false,
           "x-ms-optionsetdisplayname": "Status",
           "x-ms-optionSetType": "State"
@@ -400,7 +328,7 @@
             null,
             null
           ],
-          "x-ms-optionsetmetadataid": "89f1d414-4736-4a30-b5f8-e8ad9c48fbca",
+          "x-ms-optionsetmetadataid": "eb9126e0-03a6-4e95-8c10-1046943f7e38",
           "x-ms-isGlobal": false,
           "x-ms-optionsetdisplayname": "Status Reason",
           "x-ms-optionSetType": "Status"
@@ -439,8 +367,8 @@
       "required": [
         "createdbyyominame",
         "createdonbehalfbyyominame",
+        "csa_contactid",
         "csa_customerid",
-        "csa_projectid",
         "modifiedbyyominame",
         "modifiedonbehalfbyyominame",
         "ownerid",

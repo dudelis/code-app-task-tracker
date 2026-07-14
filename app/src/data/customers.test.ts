@@ -12,6 +12,7 @@ import {
   fetchActiveCustomers,
   fetchAllCustomers,
   fetchCustomerProjectIds,
+  mapCustomer,
   newCustomerForm,
   selectActiveCustomers,
   selectCustomers,
@@ -38,6 +39,41 @@ function okRecord(rec: Csa_customers): IOperationResult<Csa_customers> {
   return { data: rec } as IOperationResult<Csa_customers>;
 }
 
+describe('mapCustomer', () => {
+  it('surfaces description, industry, and portfolioSummary when present on the record', () => {
+    expect(
+      mapCustomer(
+        record({
+          csa_customerid: 'a',
+          csa_name: 'Acme',
+          csa_active: true,
+          csa_description: 'A widget maker',
+          csa_industry: 'Manufacturing',
+          csa_portfoliosummary: 'Three active projects',
+        }),
+      ),
+    ).toEqual({
+      id: 'a',
+      name: 'Acme',
+      active: true,
+      description: 'A widget maker',
+      industry: 'Manufacturing',
+      portfolioSummary: 'Three active projects',
+    });
+  });
+
+  it('defaults description, industry, and portfolioSummary to empty strings when absent', () => {
+    expect(mapCustomer(record({ csa_customerid: 'a', csa_name: 'Acme', csa_active: true }))).toEqual({
+      id: 'a',
+      name: 'Acme',
+      active: true,
+      description: '',
+      industry: '',
+      portfolioSummary: '',
+    });
+  });
+});
+
 describe('selectActiveCustomers', () => {
   it('keeps only active customers and projects to the UI shape', () => {
     const records = [
@@ -47,8 +83,8 @@ describe('selectActiveCustomers', () => {
     ];
 
     expect(selectActiveCustomers(records)).toEqual([
-      { id: 'a', name: 'Acme', active: true },
-      { id: 'c', name: 'Gamma', active: true },
+      { id: 'a', name: 'Acme', active: true, description: '', industry: '', portfolioSummary: '' },
+      { id: 'c', name: 'Gamma', active: true, description: '', industry: '', portfolioSummary: '' },
     ]);
   });
 
@@ -73,8 +109,8 @@ describe('fetchActiveCustomers', () => {
       orderBy: ['csa_name asc'],
     });
     expect(customers).toEqual([
-      { id: 'a', name: 'Acme', active: true },
-      { id: 'c', name: 'Gamma', active: true },
+      { id: 'a', name: 'Acme', active: true, description: '', industry: '', portfolioSummary: '' },
+      { id: 'c', name: 'Gamma', active: true, description: '', industry: '', portfolioSummary: '' },
     ]);
   });
 
@@ -86,7 +122,9 @@ describe('fetchActiveCustomers', () => {
       ]),
     );
 
-    expect(await fetchActiveCustomers(fetch)).toEqual([{ id: 'a', name: 'Acme', active: true }]);
+    expect(await fetchActiveCustomers(fetch)).toEqual([
+      { id: 'a', name: 'Acme', active: true, description: '', industry: '', portfolioSummary: '' },
+    ]);
   });
 
   it('returns an empty list when the data source yields no data', async () => {
@@ -103,8 +141,8 @@ describe('selectCustomers', () => {
     ];
 
     expect(selectCustomers(records)).toEqual([
-      { id: 'a', name: 'Acme', active: true },
-      { id: 'b', name: 'Beta', active: false },
+      { id: 'a', name: 'Acme', active: true, description: '', industry: '', portfolioSummary: '' },
+      { id: 'b', name: 'Beta', active: false, description: '', industry: '', portfolioSummary: '' },
     ]);
   });
 });
@@ -122,8 +160,8 @@ describe('fetchAllCustomers', () => {
 
     expect(fetch).toHaveBeenCalledWith({ orderBy: ['csa_name asc'] });
     expect(customers).toEqual([
-      { id: 'a', name: 'Acme', active: true },
-      { id: 'b', name: 'Beta', active: false },
+      { id: 'a', name: 'Acme', active: true, description: '', industry: '', portfolioSummary: '' },
+      { id: 'b', name: 'Beta', active: false, description: '', industry: '', portfolioSummary: '' },
     ]);
   });
 
@@ -153,32 +191,56 @@ describe('updateCustomerActive', () => {
 
 describe('newCustomerForm', () => {
   it('starts empty with Active defaulting to Yes', () => {
-    expect(newCustomerForm()).toEqual({ name: '', active: true });
+    expect(newCustomerForm()).toEqual({ name: '', active: true, description: '', industry: '', portfolioSummary: '' });
   });
 });
 
 describe('customerToForm', () => {
   it('projects an existing customer into editable form values', () => {
-    expect(customerToForm({ id: 'c1', name: 'Acme', active: false })).toEqual({
+    expect(
+      customerToForm({
+        id: 'c1',
+        name: 'Acme',
+        active: false,
+        description: 'A widget maker',
+        industry: 'Manufacturing',
+        portfolioSummary: 'Three active projects',
+      }),
+    ).toEqual({
       name: 'Acme',
       active: false,
+      description: 'A widget maker',
+      industry: 'Manufacturing',
+      portfolioSummary: 'Three active projects',
     });
   });
 });
 
 describe('validateCustomerForm', () => {
   it('reports no errors when the name is present', () => {
-    expect(validateCustomerForm({ name: 'Acme', active: true })).toEqual({});
+    expect(
+      validateCustomerForm({ name: 'Acme', active: true, description: '', industry: '', portfolioSummary: '' }),
+    ).toEqual({});
+  });
+
+  it('does not require description or industry', () => {
+    expect(
+      validateCustomerForm({ name: 'Acme', active: true, description: '', industry: '', portfolioSummary: '' }),
+    ).toEqual({});
   });
 
   it('requires a name', () => {
-    expect(validateCustomerForm({ name: '', active: true })).toEqual({
+    expect(
+      validateCustomerForm({ name: '', active: true, description: '', industry: '', portfolioSummary: '' }),
+    ).toEqual({
       name: 'Name is required.',
     });
   });
 
   it('treats a whitespace-only name as missing', () => {
-    expect(validateCustomerForm({ name: '   ', active: true })).toEqual({
+    expect(
+      validateCustomerForm({ name: '   ', active: true, description: '', industry: '', portfolioSummary: '' }),
+    ).toEqual({
       name: 'Name is required.',
     });
   });
@@ -190,10 +252,29 @@ describe('createCustomer', () => {
       okRecord(record({ csa_customerid: 'new-id', csa_name: 'Acme', csa_active: true })),
     );
 
-    const created = await createCustomer(create, { name: '  Acme  ', active: true });
+    const created = await createCustomer(create, {
+      name: '  Acme  ',
+      active: true,
+      description: 'A widget maker',
+      industry: 'Manufacturing',
+      portfolioSummary: '',
+    });
 
-    expect(create).toHaveBeenCalledWith({ csa_name: 'Acme', csa_active: true });
-    expect(created).toEqual({ id: 'new-id', name: 'Acme', active: true });
+    expect(create).toHaveBeenCalledWith({
+      csa_name: 'Acme',
+      csa_active: true,
+      csa_description: 'A widget maker',
+      csa_industry: 'Manufacturing',
+      csa_portfoliosummary: '',
+    });
+    expect(created).toEqual({
+      id: 'new-id',
+      name: 'Acme',
+      active: true,
+      description: 'A widget maker',
+      industry: 'Manufacturing',
+      portfolioSummary: '',
+    });
   });
 
   it('carries the chosen Active state through', async () => {
@@ -201,9 +282,15 @@ describe('createCustomer', () => {
       okRecord(record({ csa_customerid: 'new-id' })),
     );
 
-    await createCustomer(create, { name: 'Beta', active: false });
+    await createCustomer(create, { name: 'Beta', active: false, description: '', industry: '', portfolioSummary: '' });
 
-    expect(create).toHaveBeenCalledWith({ csa_name: 'Beta', csa_active: false });
+    expect(create).toHaveBeenCalledWith({
+      csa_name: 'Beta',
+      csa_active: false,
+      csa_description: '',
+      csa_industry: '',
+      csa_portfoliosummary: '',
+    });
   });
 });
 
@@ -211,10 +298,29 @@ describe('updateCustomer', () => {
   it('updates through the seam with a trimmed name and returns the projection', async () => {
     const update: CustomerUpdater = vi.fn(async () => ({}) as IOperationResult<Csa_customers>);
 
-    const updated = await updateCustomer(update, 'c1', { name: '  Renamed  ', active: false });
+    const updated = await updateCustomer(update, 'c1', {
+      name: '  Renamed  ',
+      active: false,
+      description: 'Now with detail',
+      industry: 'Retail',
+      portfolioSummary: 'Portfolio note',
+    });
 
-    expect(update).toHaveBeenCalledWith('c1', { csa_name: 'Renamed', csa_active: false });
-    expect(updated).toEqual({ id: 'c1', name: 'Renamed', active: false });
+    expect(update).toHaveBeenCalledWith('c1', {
+      csa_name: 'Renamed',
+      csa_active: false,
+      csa_description: 'Now with detail',
+      csa_industry: 'Retail',
+      csa_portfoliosummary: 'Portfolio note',
+    });
+    expect(updated).toEqual({
+      id: 'c1',
+      name: 'Renamed',
+      active: false,
+      description: 'Now with detail',
+      industry: 'Retail',
+      portfolioSummary: 'Portfolio note',
+    });
   });
 });
 

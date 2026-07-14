@@ -16,7 +16,10 @@ export type Csa_customersstatuscode = keyof typeof Csa_customersstatuscode;
 export interface Csa_customersBase {
   csa_active?: boolean;
   csa_customerid: string;
+  csa_description?: string;
+  csa_industry?: string;
   csa_name?: string;
+  csa_portfoliosummary?: string;
   importsequencenumber?: number;
   overriddencreatedon?: string;
   ownerid: string;
