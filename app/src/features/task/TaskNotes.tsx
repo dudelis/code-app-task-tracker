@@ -1,36 +1,29 @@
 import { useEffect, useState } from 'react'
-import Alert from '@mui/material/Alert'
-import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
-import Stack from '@mui/material/Stack'
-import TextField from '@mui/material/TextField'
-import Typography from '@mui/material/Typography'
-import { createNote, deleteNote, fetchTaskNotes, type Note } from '../../data/notes'
+import {
+  createNote,
+  deleteNote,
+  fetchTaskNotesOldestFirst,
+  type Note,
+} from '../../data/notes'
 import { Csa_notesService } from '../../generated/services/Csa_notesService'
-
-/** Format a note's ISO timestamp for display, falling back to the raw string. */
-function formatNoteTime(iso: string): string {
-  if (!iso) return ''
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString()
-}
+import { NotesChatPanel } from '../../components/NotesChatPanel'
 
 /**
- * The dated note timeline for a task: a composer to add a new note and the
- * accumulated notes shown newest-first as one chronological timeline. Notes are
- * task-scoped; loading and creating both go through the notes data-access seam.
+ * Task notes container: loads a task's notes oldest-first (chat order) through
+ * the notes data-access seam and renders them in the reusable
+ * {@link NotesChatPanel}. Sending persists immediately (notes are never at risk
+ * on dialog close); per-note delete removes a single entry behind a confirm.
  */
 export function TaskNotes({ taskId }: { taskId: string }) {
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
-  const [draft, setDraft] = useState('')
-  const [adding, setAdding] = useState(false)
+  const [sending, setSending] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    fetchTaskNotes((options) => Csa_notesService.getAll(options), taskId)
+    fetchTaskNotesOldestFirst((options) => Csa_notesService.getAll(options), taskId)
       .then((loaded) => {
         if (!cancelled) {
           setNotes(loaded)
@@ -48,23 +41,20 @@ export function TaskNotes({ taskId }: { taskId: string }) {
     }
   }, [taskId])
 
-  const canAdd = draft.trim() !== '' && !adding
-
-  async function handleAdd() {
-    if (!canAdd) return
-    setAdding(true)
+  async function handleSend(text: string) {
+    if (text.trim() === '' || sending) return
+    setSending(true)
     setError(null)
     try {
-      await createNote((record) => Csa_notesService.create(record), taskId, draft)
-      const refreshed = await fetchTaskNotes(
+      await createNote((record) => Csa_notesService.create(record), taskId, text)
+      const refreshed = await fetchTaskNotesOldestFirst(
         (options) => Csa_notesService.getAll(options),
         taskId,
       )
       setNotes(refreshed)
-      setDraft('')
-      setAdding(false)
+      setSending(false)
     } catch (e: unknown) {
-      setAdding(false)
+      setSending(false)
       setError(e instanceof Error ? e.message : 'Could not add the note.')
     }
   }
@@ -86,61 +76,14 @@ export function TaskNotes({ taskId }: { taskId: string }) {
   }
 
   return (
-    <Box component="section" aria-label="Notes" sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Typography variant="subtitle1" component="h3">
-        Notes
-      </Typography>
-      <TextField
-        multiline
-        minRows={3}
-        placeholder="Add a note…"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      <Button
-        type="button"
-        variant="outlined"
-        onClick={handleAdd}
-        disabled={!canAdd}
-        sx={{ alignSelf: 'flex-start' }}
-      >
-        {adding ? 'Adding…' : 'Add Note'}
-      </Button>
-      {error && <Alert severity="error">{error}</Alert>}
-      {loading ? (
-        <Typography variant="body2" color="text.secondary">
-          Loading notes…
-        </Typography>
-      ) : notes.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No notes yet.
-        </Typography>
-      ) : (
-        <Stack component="ol" spacing={1.5} sx={{ listStyle: 'none', m: 0, p: 0 }}>
-          {notes.map((note) => (
-            <Box component="li" key={note.id}>
-              <Stack direction="row" sx={{ alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {formatNoteTime(note.createdOn)}
-                </Typography>
-                <Button
-                  type="button"
-                  size="small"
-                  color="error"
-                  aria-label="Delete note"
-                  disabled={deletingId === note.id}
-                  onClick={() => void handleDeleteNote(note.id)}
-                >
-                  {deletingId === note.id ? 'Deleting…' : 'Delete'}
-                </Button>
-              </Stack>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                {note.text}
-              </Typography>
-            </Box>
-          ))}
-        </Stack>
-      )}
-    </Box>
+    <NotesChatPanel
+      notes={notes}
+      loading={loading}
+      error={error}
+      sending={sending}
+      deletingId={deletingId}
+      onSend={handleSend}
+      onDelete={handleDeleteNote}
+    />
   )
 }

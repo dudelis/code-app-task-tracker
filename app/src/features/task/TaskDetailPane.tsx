@@ -4,14 +4,11 @@ import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
-import Divider from '@mui/material/Divider'
-import Drawer from '@mui/material/Drawer'
-import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
+import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import CloseIcon from '@mui/icons-material/Close'
 import {
   RESPONSIBLE_CHOICES,
   taskToForm,
@@ -26,15 +23,38 @@ import { runTaskCascade, writeTaskLabels } from '../../data/cascades'
 import type { Project } from '../../data/projects'
 import type { Customer } from '../../data/customers'
 import type { TaskPane } from '../../types'
-import { TASK_DRAWER_WIDTH } from '../../shared/layout'
+import { isFormDirty } from '../../shared/formDirty'
+import { DetailDialog } from '../../components/DetailDialog'
 import { TaskNotes } from './TaskNotes'
 import { Csa_tasksService } from '../../generated/services/Csa_tasksService'
 import { Csa_labelsService } from '../../generated/services/Csa_labelsService'
 
+const TASK_FORM_ID = 'task-detail-form'
+
 /**
- * The right-anchored, edit-only Task drawer: task fields, a label picker with
- * inline create, a hard-delete action (ADR-0002 cascade), and the Notes
- * timeline. Saving persists the task and its label set together.
+ * A flat, comparable snapshot of the task form (fields + selected label ids) for
+ * the unsaved-edits close-guard. Built as an explicit `Record` so the pure
+ * {@link isFormDirty} predicate can diff current vs the originals captured on open.
+ */
+function dirtySnapshot(values: TaskFormValues, labelIds: string[]): Record<string, unknown> {
+  return {
+    name: values.name,
+    status: values.status,
+    responsible: values.responsible,
+    duedate: values.duedate,
+    description: values.description,
+    projectId: values.projectId,
+    labelIds,
+  }
+}
+
+/**
+ * The edit-only Task detail as a centered modal (ADR-0006): task fields and a
+ * label picker with inline create in the left column, the chat-style Notes panel
+ * in the right column, and a pinned footer with Save / Cancel and a separated,
+ * error-styled Delete (ADR-0002 cascade). Saving persists the task and its label
+ * set together and keeps the dialog open with a brief confirmation; backdrop/Esc
+ * are blocked while field edits are unsaved.
  */
 export function TaskDetailPane({
   pane,
@@ -61,15 +81,23 @@ export function TaskDetailPane({
 }) {
   const [values, setValues] = useState<TaskFormValues>(() => taskToForm(pane.task))
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(() => attachedLabelIds)
+  // Snapshot of the pristine form captured when the dialog opened. Reset after a
+  // successful save so the close-guard clears once edits are persisted.
+  const [original, setOriginal] = useState<Record<string, unknown>>(() =>
+    dirtySnapshot(taskToForm(pane.task), attachedLabelIds),
+  )
   const [labelDraft, setLabelDraft] = useState('')
   const [labelBusy, setLabelBusy] = useState(false)
   const [labelError, setLabelError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [savedOpen, setSavedOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const errors = validateTaskForm(values)
   const canSave = Object.keys(errors).length === 0
+
+  const dirty = isFormDirty(dirtySnapshot(values, selectedLabelIds), original)
 
   // Selectable projects for the Project reassign dropdown, flattened as
   // "Customer — Project" and restricted to active projects. The task's current
@@ -146,7 +174,12 @@ export function TaskDetailPane({
       )
       const savedIds = await saveTaskLabels(writeTaskLabels, saved.id, selectedLabelIds)
       const savedLabels = allLabels.filter((label) => savedIds.includes(label.id))
+      // Re-baseline the dirty snapshot so the close-guard clears now that the
+      // fields (and label set) are persisted; the dialog stays open.
+      setOriginal(dirtySnapshot(taskToForm(saved), savedIds))
+      setSelectedLabelIds(savedIds)
       setSaving(false)
+      setSavedOpen(true)
       onLabelsSaved(saved.id, savedLabels)
       onSaved(saved)
     } catch (e: unknown) {
@@ -158,7 +191,7 @@ export function TaskDetailPane({
   /**
    * Hard-delete this task and its subtree (ADR-0002) behind a plain confirm: the
    * shared cascade deletes the task's notes and detaches its label links before
-   * deleting the task itself, so no orphaned children remain.
+   * deleting the task itself, then the dialog closes and the board drops the task.
    */
   async function handleDelete() {
     if (saving || deleting) return
@@ -180,28 +213,45 @@ export function TaskDetailPane({
     }
   }
 
-  return (
-    <Drawer anchor="right" open onClose={onClose}>
-      <Box
-        sx={{
-          width: { xs: '100vw', sm: TASK_DRAWER_WIDTH },
-          maxWidth: '100vw',
-          p: 2,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-        }}
+  const footer = (
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+      <Button
+        type="button"
+        color="error"
+        variant="outlined"
+        disabled={saving || deleting}
+        onClick={handleDelete}
       >
-        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h6" component="h2">
-            Edit Task
-          </Typography>
-          <IconButton aria-label="Close" onClick={onClose}>
-            <CloseIcon />
-          </IconButton>
-        </Stack>
+        {deleting ? 'Deleting…' : 'Delete Task'}
+      </Button>
+      <Stack direction="row" spacing={1}>
+        <Button type="button" onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          form={TASK_FORM_ID}
+          variant="contained"
+          disabled={!canSave || saving}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </Stack>
+    </Stack>
+  )
+
+  return (
+    <>
+      <DetailDialog
+        title="Edit Task"
+        onClose={onClose}
+        canClose={!dirty}
+        footer={footer}
+        notes={<TaskNotes taskId={pane.task.id} />}
+      >
         <Box
           component="form"
+          id={TASK_FORM_ID}
           onSubmit={handleSubmit}
           aria-label="Edit task"
           sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
@@ -333,28 +383,15 @@ export function TaskDetailPane({
               </Typography>
             )}
           </Box>
-          <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-            <Button type="button" onClick={onClose} disabled={saving}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="contained" disabled={!canSave || saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-          </Stack>
         </Box>
-        <Button
-          type="button"
-          color="error"
-          variant="outlined"
-          disabled={saving || deleting}
-          onClick={handleDelete}
-          sx={{ alignSelf: 'flex-start' }}
-        >
-          {deleting ? 'Deleting…' : 'Delete Task'}
-        </Button>
-        <Divider />
-        <TaskNotes taskId={pane.task.id} />
-      </Box>
-    </Drawer>
+      </DetailDialog>
+      <Snackbar
+        open={savedOpen}
+        autoHideDuration={2500}
+        onClose={() => setSavedOpen(false)}
+        message="Saved"
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+    </>
   )
 }

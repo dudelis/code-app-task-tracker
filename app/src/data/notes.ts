@@ -28,6 +28,12 @@ export function taskNotesFilter(taskId: string): string {
  */
 export const NOTES_ORDER_BY = ['createdon desc'];
 
+/**
+ * Order clause for reading a task's notes oldest-first (chat order). Paired with
+ * `selectNotesOldestFirst`, which re-applies the same order client-side.
+ */
+export const NOTES_ORDER_BY_OLDEST = ['createdon asc'];
+
 /** Map a raw Dataverse record to the UI-facing Note shape. */
 export function mapNote(record: Csa_notes): Note {
   return {
@@ -46,6 +52,19 @@ export function selectNotesNewestFirst(records: Csa_notes[]): Note[] {
   return records
     .map(mapNote)
     .sort((a, b) => b.createdOn.localeCompare(a.createdOn));
+}
+
+/**
+ * Project records to the UI shape and order them oldest-first by creation time —
+ * the chat convention, with the newest note last so it lands at the bottom of a
+ * bottom-anchored, auto-scrolling notes panel. ISO 8601 timestamps sort
+ * lexicographically in chronological order, so a string comparison suffices;
+ * records with no timestamp sort first (they read as the earliest entries).
+ */
+export function selectNotesOldestFirst(records: Csa_notes[]): Note[] {
+  return records
+    .map(mapNote)
+    .sort((a, b) => a.createdOn.localeCompare(b.createdOn));
 }
 
 /**
@@ -70,6 +89,23 @@ export async function fetchTaskNotes(
     orderBy: NOTES_ORDER_BY,
   });
   return selectNotesNewestFirst(result.data ?? []);
+}
+
+/**
+ * Read a task's notes through the data-access seam as one oldest-first (chat)
+ * timeline: newest note last. Requests the ascending set from Dataverse and
+ * re-sorts client-side so the UI order is deterministic regardless of source
+ * order. Used by the chat-style notes panel, which anchors to the bottom.
+ */
+export async function fetchTaskNotesOldestFirst(
+  fetch: NotesFetcher,
+  taskId: string,
+): Promise<Note[]> {
+  const result = await fetch({
+    filter: taskNotesFilter(taskId),
+    orderBy: NOTES_ORDER_BY_OLDEST,
+  });
+  return selectNotesOldestFirst(result.data ?? []);
 }
 
 /**

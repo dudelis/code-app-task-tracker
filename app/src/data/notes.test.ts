@@ -3,12 +3,15 @@ import type { Csa_notes } from '../generated/models/Csa_notesModel';
 import type { IOperationResult } from '@microsoft/power-apps/data';
 import {
   NOTES_ORDER_BY,
+  NOTES_ORDER_BY_OLDEST,
   createNote,
   deleteNote,
   deleteTaskNotes,
   fetchTaskNotes,
+  fetchTaskNotesOldestFirst,
   mapNote,
   selectNotesNewestFirst,
+  selectNotesOldestFirst,
   taskBind,
   taskNotesFilter,
   type NoteCreator,
@@ -67,6 +70,41 @@ describe('selectNotesNewestFirst', () => {
   });
 });
 
+describe('selectNotesOldestFirst', () => {
+  it('orders notes oldest-first with the newest last', () => {
+    const records = [
+      record({ csa_noteid: 'new', csa_text: 'third', createdon: '2026-07-12T09:00:00Z' }),
+      record({ csa_noteid: 'old', csa_text: 'first', createdon: '2026-07-10T09:00:00Z' }),
+      record({ csa_noteid: 'mid', csa_text: 'second', createdon: '2026-07-11T09:00:00Z' }),
+    ];
+
+    expect(selectNotesOldestFirst(records).map((n) => n.id)).toEqual(['old', 'mid', 'new']);
+  });
+
+  it('is deterministic regardless of the source order', () => {
+    const ascending = [
+      record({ csa_noteid: 'old', createdon: '2026-07-10T09:00:00Z' }),
+      record({ csa_noteid: 'mid', createdon: '2026-07-11T09:00:00Z' }),
+      record({ csa_noteid: 'new', createdon: '2026-07-12T09:00:00Z' }),
+    ];
+    const descending = [...ascending].reverse();
+
+    expect(selectNotesOldestFirst(ascending).map((n) => n.id)).toEqual(
+      selectNotesOldestFirst(descending).map((n) => n.id),
+    );
+    expect(selectNotesOldestFirst(descending).map((n) => n.id)).toEqual(['old', 'mid', 'new']);
+  });
+
+  it('sorts records with no timestamp first', () => {
+    const records = [
+      record({ csa_noteid: 'dated', csa_text: 'dated', createdon: '2026-07-11T09:00:00Z' }),
+      record({ csa_noteid: 'none', csa_text: 'undated' }),
+    ];
+
+    expect(selectNotesOldestFirst(records).map((n) => n.id)).toEqual(['none', 'dated']);
+  });
+});
+
 describe('taskNotesFilter', () => {
   it('filters notes to a single parent task', () => {
     expect(taskNotesFilter('t-1')).toBe('_csa_taskid_value eq t-1');
@@ -100,6 +138,25 @@ describe('fetchTaskNotes', () => {
   it('returns an empty timeline when the data source returns no data', async () => {
     const fetch: NotesFetcher = vi.fn(async () => ({}) as IOperationResult<Csa_notes[]>);
     expect(await fetchTaskNotes(fetch, 't-1')).toEqual([]);
+  });
+});
+
+describe('fetchTaskNotesOldestFirst', () => {
+  it('reads a task timeline through the seam, ordered oldest-first', async () => {
+    const fetch: NotesFetcher = vi.fn(async () =>
+      okList([
+        record({ csa_noteid: 'new', createdon: '2026-07-12T09:00:00Z' }),
+        record({ csa_noteid: 'old', createdon: '2026-07-10T09:00:00Z' }),
+      ]),
+    );
+
+    const notes = await fetchTaskNotesOldestFirst(fetch, 't-1');
+
+    expect(fetch).toHaveBeenCalledWith({
+      filter: taskNotesFilter('t-1'),
+      orderBy: NOTES_ORDER_BY_OLDEST,
+    });
+    expect(notes.map((n) => n.id)).toEqual(['old', 'new']);
   });
 });
 

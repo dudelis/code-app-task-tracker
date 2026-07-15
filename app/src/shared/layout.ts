@@ -1,8 +1,12 @@
 /** Width of the persistent left rail that lists Customers. */
 export const RAIL_WIDTH = 260
 
-/** Width of the right-anchored Customer/Project/Task detail drawers. */
-export const DRAWER_WIDTH = 360
+/**
+ * Width of the centered detail Dialog shell (`DetailDialog`) on desktop; the
+ * dialog goes fullscreen below the `sm` breakpoint. Sized to comfortably hold a
+ * two-column fields + notes-chat layout.
+ */
+export const DETAIL_DIALOG_WIDTH = 920
 
-/** Wider width for the Task drawer, which also hosts the Notes timeline. */
-export const TASK_DRAWER_WIDTH = 440
+/** Height cap for the centered detail Dialog so its inner columns scroll. */
+export const DETAIL_DIALOG_MAX_HEIGHT = '85vh'

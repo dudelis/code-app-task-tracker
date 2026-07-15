@@ -380,7 +380,7 @@ function App() {
                 onClose={() => setCustomerPane(null)}
                 onSaved={(customer) => {
                   applyCustomerUpsert(customer)
-                  setCustomerPane(null)
+                  setCustomerPane({ mode: 'edit', customer })
                 }}
               />
             )}
@@ -392,7 +392,7 @@ function App() {
                 onClose={() => setProjectPane(null)}
                 onSaved={(project) => {
                   applyProjectUpsert(project)
-                  setProjectPane(null)
+                  setProjectPane({ mode: 'edit', project })
                 }}
               />
             )}

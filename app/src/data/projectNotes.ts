@@ -32,6 +32,13 @@ export function projectNotesFilter(projectId: string): string {
  */
 export const PROJECT_NOTES_ORDER_BY = ['createdon desc'];
 
+/**
+ * Order clause for reading a project's notes oldest-first (chat order). Paired
+ * with `selectProjectNotesOldestFirst`, which re-applies the same order
+ * client-side.
+ */
+export const PROJECT_NOTES_ORDER_BY_OLDEST = ['createdon asc'];
+
 /** Map a raw Dataverse record to the UI-facing ProjectNote shape. */
 export function mapProjectNote(record: Csa_projectnotes): ProjectNote {
   return {
@@ -50,6 +57,19 @@ export function selectProjectNotesNewestFirst(records: Csa_projectnotes[]): Proj
   return records
     .map(mapProjectNote)
     .sort((a, b) => b.createdOn.localeCompare(a.createdOn));
+}
+
+/**
+ * Project records to the UI shape and order them oldest-first by creation time —
+ * the chat convention, with the newest note last so it lands at the bottom of a
+ * bottom-anchored, auto-scrolling notes panel. ISO 8601 timestamps sort
+ * lexicographically in chronological order, so a string comparison suffices;
+ * records with no timestamp sort first (they read as the earliest entries).
+ */
+export function selectProjectNotesOldestFirst(records: Csa_projectnotes[]): ProjectNote[] {
+  return records
+    .map(mapProjectNote)
+    .sort((a, b) => a.createdOn.localeCompare(b.createdOn));
 }
 
 /**
@@ -74,6 +94,23 @@ export async function fetchProjectNotes(
     orderBy: PROJECT_NOTES_ORDER_BY,
   });
   return selectProjectNotesNewestFirst(result.data ?? []);
+}
+
+/**
+ * Read a project's notes through the data-access seam as one oldest-first (chat)
+ * timeline: newest note last. Requests the ascending set from Dataverse and
+ * re-sorts client-side so the UI order is deterministic regardless of source
+ * order. Used by the chat-style notes panel, which anchors to the bottom.
+ */
+export async function fetchProjectNotesOldestFirst(
+  fetch: ProjectNotesFetcher,
+  projectId: string,
+): Promise<ProjectNote[]> {
+  const result = await fetch({
+    filter: projectNotesFilter(projectId),
+    orderBy: PROJECT_NOTES_ORDER_BY_OLDEST,
+  });
+  return selectProjectNotesOldestFirst(result.data ?? []);
 }
 
 /**
